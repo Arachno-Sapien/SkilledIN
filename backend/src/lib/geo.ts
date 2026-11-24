@@ -7,7 +7,27 @@ export interface GeoLocation {
   displayName?: string;
 }
 
-const localities: { name: string; lat: number; lng: number }[] = localitiesData;
+// Longest name first so "Vijayanagar" is matched before its substring "Jayanagar".
+const localities: { name: string; lat: number; lng: number }[] = [...localitiesData].sort(
+  (a, b) => b.name.length - a.name.length
+);
+
+const CITY = /bengaluru|bangalore/i;
+
+/**
+ * Amazon Location answers a misheard area with the city or state itself; accepting that would pin the
+ * worker to the centre of Bengaluru. Keep only neighbourhood-level hits with a good match score.
+ */
+export function isUsableHit(
+  item: { PlaceType?: string; Title?: string; MatchScores?: { Overall?: number } } | undefined,
+  areaName: string
+): boolean {
+  if (!item) return false;
+  if (["Country", "Region", "SubRegion"].includes(item.PlaceType ?? "")) return false;
+  if (item.PlaceType === "Locality" && CITY.test(item.Title ?? "") && !CITY.test(areaName)) return false;
+  // ponytail: 0.8 is a first guess — tune it from logged MatchScores of real misses.
+  return (item.MatchScores?.Overall ?? 1) >= 0.8;
+}
 
 let geoPlacesClient: GeoPlacesClient | null = null;
 
@@ -59,7 +79,7 @@ export async function geocode(areaName: string): Promise<GeoLocation | null> {
 
     const response = await client.send(command);
     const result = response.ResultItems?.[0];
-    if (result && result.Position && result.Position.length >= 2) {
+    if (result && isUsableHit(result, areaName) && result.Position && result.Position.length >= 2) {
       const [lon, lat] = result.Position;
       return {
         lat,

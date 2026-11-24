@@ -1,7 +1,7 @@
-import React, { useState } from "react";
-import { Volume2, Loader2 } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Volume2, Square, Loader2 } from "lucide-react";
 import { useLanguage } from "../i18n";
-import { api } from "../api";
+import { speak, stopSpeaking } from "../lib/speech";
 
 interface SpeakButtonProps {
   text: string;
@@ -9,100 +9,79 @@ interface SpeakButtonProps {
   size?: "sm" | "md" | "lg";
 }
 
-const audioCache = new Map<string, string>();
+// speak() already plays one utterance at a time; this only keeps the buttons' UI in step,
+// so a button whose speech was replaced by another button's goes back to "Listen".
+let resetOwner: (() => void) | null = null;
 
 /**
- * Voice fallback chain:
- * 1. Cache hit -> play instant
- * 2. Backend /api/voice/tts -> play audioBase64
- * 3. window.speechSynthesis (kn-IN / hi-IN / en-IN)
- * 4. Graceful visual status
+ * Tap to hear `text` in the current language (ElevenLabs first, browser voice fallback, via lib/speech).
+ * Tap again to stop. Never disabled, so the worker can always silence it.
  */
-export const SpeakButton: React.FC<SpeakButtonProps> = ({
-  text,
-  className = "",
-  size = "md",
-}) => {
-  const { lang } = useLanguage();
-  const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(false);
+export const SpeakButton: React.FC<SpeakButtonProps> = ({ text, className = "", size = "md" }) => {
+  const { lang, t } = useLanguage();
+  const [phase, setPhase] = useState<"idle" | "loading" | "playing">("idle");
+  const timer = useRef<number>();
+  const active = useRef(false);
 
-  const speak = async () => {
-    if (playing || loading) return;
+  // Stable identity (only touches refs and the state setter) so `resetOwner === reset` works across renders.
+  const reset = useRef(() => {
+    window.clearTimeout(timer.current);
+    active.current = false;
+    if (resetOwner === reset) resetOwner = null;
+    setPhase("idle");
+  }).current;
 
-    const cacheKey = `${lang}::${text}`;
-    if (audioCache.has(cacheKey)) {
-      const base64 = audioCache.get(cacheKey)!;
-      playBase64(base64);
+  // Leaving the screen stops this button's audio so it does not keep talking over the next page.
+  useEffect(
+    () => () => {
+      window.clearTimeout(timer.current);
+      if (active.current && resetOwner === reset) {
+        resetOwner = null;
+        stopSpeaking();
+      }
+      active.current = false;
+    },
+    [reset]
+  );
+
+  const handleClick = async () => {
+    if (phase !== "idle") {
+      if (resetOwner === reset) stopSpeaking();
+      reset();
       return;
     }
-
-    setLoading(true);
-    try {
-      const res = await api.getTts(text, lang);
-      if (res.audioBase64) {
-        audioCache.set(cacheKey, res.audioBase64);
-        playBase64(res.audioBase64);
-        setLoading(false);
-        return;
-      }
-    } catch {
-      // Fall through to browser speech synthesis
-    }
-
-    // Browser SpeechSynthesis fallback
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = lang === "kn" ? "kn-IN" : lang === "hi" ? "hi-IN" : "en-IN";
-      utter.onstart = () => {
-        setLoading(false);
-        setPlaying(true);
-      };
-      utter.onend = () => setPlaying(false);
-      utter.onerror = () => {
-        setLoading(false);
-        setPlaying(false);
-      };
-      window.speechSynthesis.speak(utter);
-    } else {
-      setLoading(false);
-    }
+    resetOwner?.();
+    resetOwner = reset;
+    active.current = true;
+    setPhase("loading");
+    await speak(text, lang);
+    if (!active.current) return; // stopped, replaced or unmounted while the audio was loading
+    setPhase("playing");
+    // ponytail: speak() has no "ended" signal, so Stop shows for an estimated reading time — add an onEnd callback to lib/speech.ts if exact timing matters.
+    timer.current = window.setTimeout(reset, Math.max(3000, text.length * 90));
   };
 
-  const playBase64 = (base64: string) => {
-    try {
-      const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
-      setPlaying(true);
-      audio.onended = () => setPlaying(false);
-      audio.onerror = () => setPlaying(false);
-      audio.play().catch(() => setPlaying(false));
-    } catch {
-      setPlaying(false);
-    }
-  };
-
-  const sizeClasses = {
-    sm: "w-10 h-10 p-2",
-    md: "w-12 h-12 p-3",
-    lg: "w-14 h-14 p-3.5",
-  };
+  const sizeClasses = { sm: "w-12 h-12", md: "w-14 h-14", lg: "w-16 h-16" };
+  const iconClasses = { sm: "w-5 h-5", md: "w-6 h-6", lg: "w-7 h-7" };
+  const busy = phase !== "idle";
 
   return (
     <button
       type="button"
-      onClick={speak}
-      disabled={loading || playing}
-      className={`rounded-full bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 flex items-center justify-center transition-all shadow-sm active:scale-95 disabled:opacity-75 ${
-        sizeClasses[size]
-      } ${className}`}
-      title="Listen (🔊)"
-      aria-label="Listen to instructions"
+      onClick={handleClick}
+      aria-label={busy ? t("stopAudio") : t("listen")}
+      className={`flex-shrink-0 rounded-full border flex items-center justify-center transition-all shadow-sm active:scale-95 ${
+        busy
+          ? "bg-brand-600 border-brand-700 text-white"
+          : "bg-brand-50 hover:bg-brand-100 border-brand-200 text-brand-700"
+      } ${sizeClasses[size]} ${className}`}
     >
-      {loading ? (
-        <Loader2 className="w-5 h-5 animate-spin text-brand-600" />
+      {phase === "loading" ? (
+        <Loader2 aria-hidden="true" className={`${iconClasses[size]} animate-spin`} />
+      ) : phase === "playing" ? (
+        <Square aria-hidden="true" className={`${iconClasses[size]} fill-current`} />
       ) : (
-        <Volume2 className={`w-5 h-5 ${playing ? "animate-pulse text-brand-600" : ""}`} />
+        <Volume2 aria-hidden="true" className={iconClasses[size]} />
       )}
     </button>
   );

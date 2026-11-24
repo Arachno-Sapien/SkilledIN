@@ -7,6 +7,8 @@ import { challengesRouter } from "./routes/challenges.js";
 import { jobsRouter } from "./routes/jobs.js";
 import { stampsRouter } from "./routes/stamps.js";
 import { voiceRouter } from "./routes/voice.js";
+import { storeMode } from "./lib/db.js";
+import { errorHandler } from "./lib/http.js";
 
 export const app = express();
 
@@ -29,7 +31,8 @@ app.use(express.json({ limit: "6mb" }));
 
 // Health check
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, name: "SkilledIN API", timestamp: new Date().toISOString() });
+  // store shows whether registrations reach DynamoDB or only this process's memory.
+  res.json({ ok: true, name: "SkilledIN API", store: storeMode(), timestamp: new Date().toISOString() });
 });
 
 // Mock upload for local development testing
@@ -44,6 +47,9 @@ app.use("/api/challenges", challengesRouter);
 app.use("/api/jobs", jobsRouter);
 app.use("/api/stamps", stampsRouter);
 app.use("/api/voice", voiceRouter);
+
+// Registered last so it catches errors from every route above.
+app.use(errorHandler);
 
 // Lambda Function URL entry point: serverless-http turns the URL event into an Express request.
 export const handler = serverless(app);

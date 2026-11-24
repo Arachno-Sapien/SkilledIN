@@ -1,84 +1,89 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { useLanguage, type Language } from "../i18n";
-import { ShieldCheck, Globe, Volume2 } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { translations, useLanguage, type Language } from "../i18n";
+import { speak } from "../lib/speech";
+
+// Autonyms are shown as-is in every UI language so a worker can always find their own language.
+const LANGS: { code: Language; label: string; ariaLabel?: string }[] = [
+  { code: "kn", label: "ಕನ್ನಡ" },
+  { code: "hi", label: "हिंदी" },
+  { code: "en", label: "EN", ariaLabel: "English" },
+];
 
 export const Navbar: React.FC = () => {
-  const { lang, setLang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isHome = location.pathname === "/";
 
   const handleLangChange = (newLang: Language) => {
     setLang(newLang);
-    // Audio greeting on switch
-    try {
-      const greetings: Record<Language, string> = {
-        en: "Language set to English",
-        hi: "भाषा हिंदी चुनी गई",
-        kn: "ಕನ್ನಡ ಭಾಷೆ ಆಯ್ಕೆಯಾಗಿದೆ",
-      };
-      if ("speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(greetings[newLang]);
-        utter.lang = newLang === "kn" ? "kn-IN" : newLang === "hi" ? "hi-IN" : "en-IN";
-        window.speechSynthesis.speak(utter);
-      }
-    } catch {}
+    // Confirm in the NEW language; t() would still read the old one inside this handler.
+    speak(translations.navLangSwitched[newLang], newLang);
   };
+
+  // A deep link (QR scan, shared URL) opens with no in-app history, so Back must go Home instead of leaving the app.
+  const goBack = () => (location.key === "default" ? navigate("/") : navigate(-1));
 
   return (
     <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-white shadow-sm">
-      <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center space-x-2.5 group">
-          <div className="w-10 h-10 rounded-xl bg-brand-500 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xl font-extrabold tracking-tight text-white block leading-tight">
-              Skilled<span className="text-brand-400">IN</span>
-            </span>
-            <span className="text-[10px] tracking-wider text-slate-400 uppercase font-semibold block">
-              Skill Passport
-            </span>
-          </div>
-        </Link>
+      <div className="max-w-md mx-auto px-3 h-16 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {!isHome && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="min-h-[48px] min-w-[48px] px-2 flex items-center gap-1 rounded-xl text-sm font-bold text-white hover:bg-slate-800 active:scale-95"
+            >
+              <ArrowLeft aria-hidden="true" className="w-5 h-5 flex-shrink-0" />
+              <span>{t("back")}</span>
+            </button>
+          )}
+          <Link
+            to="/"
+            aria-label={t("home")}
+            className="min-h-[48px] min-w-[48px] flex items-center gap-2.5 rounded-xl group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+              <ShieldCheck aria-hidden="true" className="w-6 h-6" />
+            </div>
+            {/* The wordmark only fits beside the Back button at 360 px on the home screen. */}
+            {isHome && (
+              <div aria-hidden="true">
+                <span className="text-xl font-extrabold tracking-tight text-white block leading-tight">
+                  Skilled<span className="text-brand-400">IN</span>
+                </span>
+                <span className="text-xs tracking-wide text-slate-300 font-semibold block">
+                  {t("skillPassport")}
+                </span>
+              </div>
+            )}
+          </Link>
+        </div>
 
-        {/* Multilingual Selector Pills with Mobile-Optimized Touch Target (min 40px) */}
-        <div className="flex items-center space-x-1 bg-slate-800/90 p-1 rounded-2xl border border-slate-700 shadow-inner">
-          <button
-            onClick={() => handleLangChange("kn")}
-            className={`min-h-[40px] px-3 py-1.5 text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center justify-center ${
-              lang === "kn"
-                ? "bg-brand-500 text-white shadow-md shadow-brand-500/30"
-                : "text-slate-300 hover:text-white"
-            }`}
-            title="ಕನ್ನಡ"
-            aria-label="Switch language to Kannada"
-          >
-            ಕನ್ನಡ
-          </button>
-          <button
-            onClick={() => handleLangChange("hi")}
-            className={`min-h-[40px] px-3 py-1.5 text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center justify-center ${
-              lang === "hi"
-                ? "bg-brand-500 text-white shadow-md shadow-brand-500/30"
-                : "text-slate-300 hover:text-white"
-            }`}
-            title="हिंदी"
-            aria-label="Switch language to Hindi"
-          >
-            हिंदी
-          </button>
-          <button
-            onClick={() => handleLangChange("en")}
-            className={`min-h-[40px] px-3 py-1.5 text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center justify-center ${
-              lang === "en"
-                ? "bg-brand-500 text-white shadow-md shadow-brand-500/30"
-                : "text-slate-300 hover:text-white"
-            }`}
-            title="English"
-            aria-label="Switch language to English"
-          >
-            EN
-          </button>
+        <div
+          role="group"
+          aria-label={t("language")}
+          className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-2xl border border-slate-700 shadow-inner flex-shrink-0"
+        >
+          {LANGS.map(({ code, label, ariaLabel }) => (
+            <button
+              key={code}
+              type="button"
+              lang={code}
+              aria-label={ariaLabel}
+              aria-pressed={lang === code}
+              onClick={() => handleLangChange(code)}
+              className={`min-h-[48px] min-w-[48px] px-2.5 text-sm font-bold rounded-xl transition-all active:scale-95 flex items-center justify-center ${
+                lang === code
+                  ? "bg-brand-600 text-white shadow-md"
+                  : "text-slate-200 hover:text-white hover:bg-slate-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </header>

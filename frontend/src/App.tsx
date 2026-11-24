@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { ConversationProvider } from "@elevenlabs/react";
-import { LanguageProvider } from "./i18n";
+import { LanguageProvider, useLanguage } from "./i18n";
 import { Navbar } from "./components/Navbar";
 import { Landing } from "./pages/Landing";
 import { WorkerOnboard } from "./pages/WorkerOnboard";
@@ -14,6 +14,10 @@ import { JobStatus } from "./components/JobStatus";
 
 const JobStatusPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { lang, t } = useLanguage();
+  useEffect(() => {
+    document.title = `${t("jobPageTitle")} · SkilledIN`;
+  }, [lang]); // t() only changes when lang does
   if (!id) return null;
   return (
     <div className="max-w-md mx-auto p-4 py-8">

@@ -1,7 +1,8 @@
 import dotenv from "dotenv";
 dotenv.config({ path: "../.env" });
 
-import { app } from "./handler.js";
+// Dynamic import: static imports are evaluated before dotenv.config() runs, so module-level env reads would miss .env.
+const { app } = await import("./handler.js");
 
 const PORT = process.env.PORT || 3001;
 

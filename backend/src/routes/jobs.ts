@@ -13,14 +13,14 @@ import {
   daysAgo,
 } from "../lib/scoring.js";
 import skillsData from "../data/skills.json" with { type: "json" };
-import { sendJson, sendError } from "../lib/http.js";
+import { sendJson, sendError, ah } from "../lib/http.js";
 
 export const jobsRouter = Router();
 
 const JobTradeEnum = z.enum(["electrician", "plumber", "mason"]);
 
 // POST /api/jobs
-jobsRouter.post("/", async (req, res) => {
+jobsRouter.post("/", ah(async (req, res) => {
   const schema = z.object({
     trade: JobTradeEnum,
     count: z.number().int().min(1).default(1),
@@ -164,10 +164,10 @@ jobsRouter.post("/", async (req, res) => {
     job: publicJob,
     matches: selectedMatches,
   });
-});
+}));
 
 // GET /api/jobs/:id
-jobsRouter.get("/:id", async (req, res) => {
+jobsRouter.get("/:id", ah(async (req, res) => {
   const jobId = req.params.id;
   const job = await db.get(`JOB#${jobId}`, "META");
 
@@ -196,10 +196,10 @@ jobsRouter.get("/:id", async (req, res) => {
     job: safeJob,
     acceptedWorkers,
   });
-});
+}));
 
 // POST /api/jobs/:id/accept
-jobsRouter.post("/:id/accept", async (req, res) => {
+jobsRouter.post("/:id/accept", ah(async (req, res) => {
   const jobId = req.params.id;
   const schema = z.object({
     workerId: z.string().min(1),
@@ -222,4 +222,4 @@ jobsRouter.post("/:id/accept", async (req, res) => {
   }
 
   return sendJson(res, 200, { ok: true, status: "accepted" });
-});
+}));

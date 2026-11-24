@@ -3,11 +3,11 @@ import { z } from "zod";
 import crypto from "node:crypto";
 import { db } from "../lib/db.js";
 import { transcribeAudio } from "../lib/elevenlabs.js";
-import { sendJson, sendError } from "../lib/http.js";
+import { sendJson, sendError, ah } from "../lib/http.js";
 
 export const stampsRouter = Router();
 
-stampsRouter.post("/", async (req, res) => {
+stampsRouter.post("/", ah(async (req, res) => {
   const schema = z.object({
     workerId: z.string().min(1),
     rating: z.number().int().min(1).max(5),
@@ -57,4 +57,4 @@ stampsRouter.post("/", async (req, res) => {
   await db.put(stampItem);
 
   return sendJson(res, 201, stampItem);
-});
+}));

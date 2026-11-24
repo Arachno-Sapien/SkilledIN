@@ -7,7 +7,7 @@
     "check": "tsc --noEmit",
     "build": "tsc",
     "dev": "tsx watch src/local.ts",
-    "test": "tsx --test test/scoring.test.ts test/ai.test.ts",
+    "test": "tsx --test test/scoring.test.ts test/ai.test.ts test/registration.test.ts",
     "seed": "tsx scripts/seed.ts",
     "ai:smoke": "tsx scripts/ai-smoke.ts"
   },

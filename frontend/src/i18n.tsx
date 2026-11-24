@@ -1,4 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { commonStrings } from "./strings/common";
+import { challengeStrings } from "./strings/challenge";
+import { onboardStrings } from "./strings/onboard";
+import { homeStrings } from "./strings/home";
+import { otherStrings } from "./strings/other";
 
 export type Language = "en" | "hi" | "kn";
 
@@ -10,7 +15,7 @@ export interface Translations {
   };
 }
 
-export const translations: Translations = {
+const baseStrings: Translations = {
   // App General
   appName: {
     en: "SkilledIN",
@@ -301,6 +306,16 @@ export const translations: Translations = {
   },
 };
 
+// Each workstream owns one strings file, so screens can be translated without editing this one.
+export const translations: Translations = {
+  ...baseStrings,
+  ...commonStrings,
+  ...challengeStrings,
+  ...onboardStrings,
+  ...homeStrings,
+  ...otherStrings,
+};
+
 interface LanguageContextType {
   lang: Language;
   setLang: (lang: Language) => void;
@@ -318,6 +333,11 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const saved = localStorage.getItem("skilledin_lang") as Language;
     return saved === "en" || saved === "hi" || saved === "kn" ? saved : "kn";
   });
+
+  // Screen readers pick pronunciation from <html lang>; keep it in step with the chosen language.
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const setLang = (newLang: Language) => {
     setLangState(newLang);

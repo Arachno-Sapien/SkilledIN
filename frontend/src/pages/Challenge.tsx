@@ -1,18 +1,24 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { api } from "../api";
+import {
+  api,
+  type ApiError,
+  type ChallengeInfo,
+  type ChallengeResult,
+  type Localized,
+} from "../api";
 import { useLanguage } from "../i18n";
 import {
   startCameraStream,
   recordVideoWithFrames,
   uploadVideoToS3,
-  playBase64Audio,
+  type VideoRecording,
 } from "../lib/media";
+import { speak, stopSpeaking, formatClock } from "../lib/speech";
 import { BigButton } from "../components/BigButton";
 import { SpeakButton } from "../components/SpeakButton";
 import { BadgeCard } from "../components/BadgeCard";
 import {
-  Video,
   Camera,
   Square,
   Sparkles,
@@ -20,274 +26,572 @@ import {
   RotateCcw,
   CheckCircle2,
   XCircle,
+  HelpCircle,
+  X,
+  ArrowLeft,
+  Loader2,
+  UserPlus,
 } from "lucide-react";
+
+const DURATION_SEC = 90;
+const WORKER_KEY = "skilledin_worker_id";
+
+type Stage = "consent" | "recording" | "analyzing" | "result";
+// What the main button in the error box does.
+type ErrorAction = "load" | "start" | "send" | "newCode" | "register";
+interface ScreenError {
+  key: string;
+  action: ErrorAction;
+}
+
+// Spoken digit by digit ("4 7 2"), not as "four hundred seventy-two".
+const spaced = (code: string) => code.split("").join(" ");
+
+function cameraErrorKey(err: unknown): string {
+  switch ((err as { name?: string } | null)?.name) {
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+    case "SecurityError":
+      return "cameraPermission";
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+    case "OverconstrainedError":
+      return "noDevice";
+    case "NotSupportedError":
+      return "mediaUnsupported";
+    case "NotReadableError":
+    case "TrackStartError":
+      return "chCameraBusy";
+    default:
+      return "chCameraFailed";
+  }
+}
 
 export const Challenge: React.FC = () => {
   const { id: workerId, skillId } = useParams<{ id: string; skillId: string }>();
   const navigate = useNavigate();
   const { lang, t } = useLanguage();
 
-  const [stage, setStage] = useState<"consent" | "recording" | "analyzing" | "result">("consent");
-  const [challengeData, setChallengeData] = useState<any>(null);
-  const [secondsLeft, setSecondsLeft] = useState(90);
-  const [isStopping, setIsStopping] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [stage, setStage] = useState<Stage>("consent");
+  const [phase, setPhase] = useState<"uploading" | "checking">("uploading");
+  const [challenge, setChallenge] = useState<ChallengeInfo | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(DURATION_SEC);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [result, setResult] = useState<ChallengeResult | null>(null);
+  const [error, setError] = useState<ScreenError | null>(null);
 
+  // Async work (create, upload, submit) can finish after the page is gone; drop those results.
+  const aliveRef = useRef(true);
+  // Only the newest createChallenge wins (StrictMode double mount, fast Retry taps).
+  const loadSeqRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<{
-    stop: () => Promise<{ videoBlob: Blob; frames: string[] }>;
-  } | null>(null);
+  const recorderRef = useRef<ReturnType<typeof recordVideoWithFrames> | null>(null);
+  // A finished take waiting to be sent: Retry re-sends it instead of asking for a new recording.
+  const pendingRef = useRef<{ recording: VideoRecording; uploaded: boolean } | null>(null);
+  const sendingRef = useRef(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Challenge
-  useEffect(() => {
-    const init = async () => {
-      if (!workerId || !skillId) return;
-      try {
-        const data = await api.createChallenge(workerId, skillId);
-        setChallengeData(data);
-        setSecondsLeft(90);
+  // Discards any take in progress and turns the camera light off.
+  const stopCamera = () => {
+    recorderRef.current?.cancel();
+    recorderRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  };
 
-        // Auto-play spaced spoken code if returned
-        if (data.audioBase64) {
-          playBase64Audio(data.audioBase64);
-        }
-      } catch (err) {
-        console.error("Challenge init failed:", err);
-        setErrorMessage("Failed to initiate challenge. Please retry.");
-      }
-    };
-    init();
+  // replace: Back from the passport must not reopen the challenge (and create another code).
+  const backToPassport = () => navigate(`/w/${workerId}`, { replace: true });
 
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      }
-    };
-  }, [workerId, skillId]);
+  const statusHeading = (status: ChallengeResult["status"]) =>
+    t(
+      status === "PASS"
+        ? "challengePassed"
+        : status === "REVIEW"
+        ? "challengeReview"
+        : "challengeFailed"
+    );
 
-  // Start Camera and Video Recording
-  const handleStartRecording = async () => {
-    setStage("recording");
+  const stepText = (id: string, text?: Localized) => {
+    const source = text ?? challenge?.checklist.find((c) => c.id === id)?.text;
+    return source ? source[lang] || source.en : id;
+  };
+
+  const resultSpeech = (res: ChallengeResult) =>
+    [
+      statusHeading(res.status),
+      res.feedback,
+      res.status === "REVIEW" ? t("chReviewNote") : "",
+      res.tip ?? "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+  // Used on open, Retake and "Get a new code". Every attempt gets a fresh challenge: new code,
+  // new upload slot and a new 15-minute window, so a retake is never answered with the old result.
+  const loadChallenge = async () => {
+    if (!workerId || !skillId) return;
+    const seq = ++loadSeqRef.current;
+    stopSpeaking();
+    pendingRef.current = null;
+    setError(null);
+    setResult(null);
+    setChallenge(null);
+    setSecondsLeft(DURATION_SEC);
+    setStage("consent");
     try {
-      if (!videoRef.current) return;
-      const stream = await startCameraStream(videoRef.current);
-      streamRef.current = stream;
-
-      const recorder = recordVideoWithFrames(
-        stream,
-        videoRef.current,
-        90,
-        (left) => {
-          setSecondsLeft(left);
-          if (left <= 0) {
-            handleStopRecording();
-          }
-        }
-      );
-      recorderRef.current = recorder;
+      // The language is fixed here: the code audio and task text use what is on screen now.
+      const data = await api.createChallenge(workerId, skillId, lang);
+      if (!aliveRef.current || seq !== loadSeqRef.current) return;
+      setChallenge(data);
+      void speak(t("chCodeSpeech", { code: spaced(data.code) }), lang, data.audioBase64);
     } catch (err) {
-      alert("Please allow camera and mic permissions to record your practical challenge.");
-      console.error("Camera access error:", err);
-      setStage("consent");
+      if (!aliveRef.current || seq !== loadSeqRef.current) return;
+      console.error("Challenge init failed:", err);
+      const code = (err as ApiError | null)?.code;
+      setError(
+        code === "NOT_FOUND"
+          ? { key: "chPassportMissing", action: "register" }
+          : { key: code === "NETWORK" ? "networkError" : "chLoadError", action: "load" }
+      );
     }
   };
 
-  const handleStopRecording = async () => {
-    if (isStopping || !recorderRef.current) return;
-    setIsStopping(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      // Leaving the page: silence audio, drop any take and release the camera.
+      aliveRef.current = false;
+      stopSpeaking();
+      stopCamera();
+    };
+  }, []);
+
+  // Not keyed on lang: switching language must not throw away the code the worker just heard.
+  useEffect(() => {
+    void loadChallenge();
+  }, [workerId, skillId]);
+
+  // The camera starts only after the recording stage has rendered, so the <video> element exists.
+  // (Starting it in the click handler read a null ref: black preview, frozen timer, dead Finish.)
+  useEffect(() => {
+    if (stage !== "recording") return;
+    const video = videoRef.current;
+    if (!video) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const stream = await startCameraStream(video);
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        streamRef.current = stream;
+        recorderRef.current = recordVideoWithFrames(stream, video, DURATION_SEC, setSecondsLeft);
+        setCameraReady(true);
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Camera start failed:", err);
+        stopCamera();
+        setError({ key: cameraErrorKey(err), action: "start" });
+        setStage("consent");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      // Any way out of recording except Finish (Cancel, error, leaving) discards the take.
+      stopCamera();
+    };
+  }, [stage]);
+
+  // Move focus with the screen so screen-reader users hear the new stage. The error box only
+  // takes focus when it replaces the stage content; elsewhere role="alert" announces it.
+  useEffect(() => {
+    (error && stage === "analyzing" ? errorRef.current : headingRef.current)?.focus();
+  }, [stage, error]);
+
+  const handleStart = () => {
+    if (!challenge) return;
+    // The phone must be silent while recording: its speaker saying the code would satisfy the code check.
+    stopSpeaking();
+    pendingRef.current = null;
+    setError(null);
+    setCameraReady(false);
+    setSecondsLeft(DURATION_SEC);
+    setStage("recording");
+  };
+
+  const handleCancel = () => {
+    // The challenge is still open, so the worker can start again with the same code.
+    setSecondsLeft(DURATION_SEC);
+    setStage("consent");
+  };
+
+  const sendRecording = async () => {
+    const pending = pendingRef.current;
+    if (!pending || !challenge || sendingRef.current) return;
+    sendingRef.current = true;
+    setError(null);
     setStage("analyzing");
-
     try {
-      const { videoBlob, frames } = await recorderRef.current.stop();
-
-      // Stop camera tracks
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
+      if (pending.recording.frames.length === 0) {
+        // Nothing the AI could grade; the challenge is still open, so record again with the same code.
+        pendingRef.current = null;
+        setError({ key: "chNoPicture", action: "start" });
+        return;
       }
-
-      // 1. Upload video to S3 / mock upload
-      if (challengeData?.upload) {
-        await uploadVideoToS3(challengeData.upload, videoBlob);
+      if (!pending.uploaded) {
+        setPhase("uploading");
+        try {
+          await uploadVideoToS3(challenge.upload, pending.recording.videoBlob);
+        } catch (err) {
+          console.error("Video upload failed:", err);
+          if (!aliveRef.current) return;
+          // The upload slot dies with the challenge (15 min); retrying it would fail forever.
+          const expired = Date.parse(challenge.expiresAt) <= Date.now();
+          setError(
+            expired
+              ? { key: "chExpired", action: "newCode" }
+              : { key: "chUploadFailed", action: "send" }
+          );
+          if (expired) pendingRef.current = null;
+          return;
+        }
+        pending.uploaded = true;
       }
-
-      // 2. Submit frames to AI grading pipeline
-      const gradeResult = await api.submitChallenge(
-        challengeData.challengeId,
-        frames,
-        `Code spoken: ${challengeData.code}`
+      if (!aliveRef.current) return;
+      setPhase("checking");
+      const res = await api.submitChallenge(
+        challenge.challengeId,
+        pending.recording.frames,
+        pending.recording.audio ?? undefined
       );
-
-      setResult(gradeResult);
+      if (!aliveRef.current) return;
+      pendingRef.current = null;
+      setResult(res);
       setStage("result");
-
-      // Play spoken feedback + tip
-      if (gradeResult.audioBase64) {
-        playBase64Audio(gradeResult.audioBase64);
-      }
+      void speak(resultSpeech(res), lang, res.audioBase64);
     } catch (err) {
-      console.error("Submit challenge error:", err);
-      setErrorMessage("Video check experienced a network issue. Please retry.");
-      setStage("result");
+      if (!aliveRef.current) return;
+      console.error("Submit challenge failed:", err);
+      const code = (err as ApiError | null)?.code;
+      if (code === "EXPIRED" || code === "NOT_FOUND") {
+        pendingRef.current = null;
+        setError({ key: "chExpired", action: "newCode" });
+      } else if (code === "VIDEO_MISSING") {
+        pending.uploaded = false;
+        setError({ key: "chVideoMissing", action: "send" });
+      } else {
+        setError({ key: code === "NETWORK" ? "networkError" : "chSubmitFailed", action: "send" });
+      }
     } finally {
-      setIsStopping(false);
+      sendingRef.current = false;
     }
+  };
+
+  const handleFinish = () => {
+    const recorder = recorderRef.current;
+    if (!recorder) return; // camera not ready yet, or already finishing (double tap / timer)
+    recorderRef.current = null; // keeps the stage cleanup from discarding this take
+    const take = recorder.stop();
+    setPhase("uploading");
+    setStage("analyzing");
+    void speak(t("chAnalyzingSpeech"), lang);
+    take.then(
+      (recording) => {
+        pendingRef.current = { recording, uploaded: false };
+        void sendRecording();
+      },
+      (err) => {
+        console.error("Recording stop failed:", err);
+        if (aliveRef.current) setError({ key: "chNoPicture", action: "start" });
+      }
+    );
+  };
+
+  // The recorder's countdown reached zero: finish as if the worker tapped Finish.
+  useEffect(() => {
+    if (stage === "recording" && cameraReady && secondsLeft <= 0) handleFinish();
+  }, [stage, cameraReady, secondsLeft]);
+
+  const registerAgain = () => {
+    if (localStorage.getItem(WORKER_KEY) === workerId) localStorage.removeItem(WORKER_KEY);
+    navigate("/w/start", { replace: true });
+  };
+
+  const errorButton = (e: ScreenError) => {
+    switch (e.action) {
+      case "load":
+        return { label: t("retry"), run: () => void loadChallenge(), icon: RotateCcw };
+      case "newCode":
+        return { label: t("chNewCode"), run: () => void loadChallenge(), icon: RotateCcw };
+      case "start":
+        return {
+          label: e.key === "chNoPicture" ? t("chRecordAgain") : t("retry"),
+          run: handleStart,
+          icon: Camera,
+        };
+      case "send":
+        return { label: t("retry"), run: () => void sendRecording(), icon: RotateCcw };
+      case "register":
+        return { label: t("chRegisterAgain"), run: registerAgain, icon: UserPlus };
+    }
+  };
+
+  // Announce the time left at 60, 30 and 10 seconds only, not every second.
+  const timeMark = [10, 30, 60].find((m) => secondsLeft <= m);
+
+  const renderError = (e: ScreenError) => {
+    const btn = errorButton(e);
+    const Icon = btn.icon;
+    return (
+      <div
+        ref={errorRef}
+        tabIndex={-1}
+        className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-400 space-y-3"
+      >
+        <p role="alert" className="flex items-start gap-2 text-base font-semibold text-rose-800">
+          <AlertCircle aria-hidden="true" className="w-6 h-6 flex-shrink-0 mt-0.5" />
+          <span>{t(e.key)}</span>
+        </p>
+        <BigButton
+          variant="primary"
+          icon={<Icon aria-hidden="true" className="w-5 h-5" />}
+          onClick={btn.run}
+          disabled={e.action === "start" && !challenge}
+        >
+          {btn.label}
+        </BigButton>
+        {/* The consent screen already has its own Back button. */}
+        {stage !== "consent" && (
+          <BigButton
+            variant="outline"
+            icon={<ArrowLeft aria-hidden="true" className="w-5 h-5" />}
+            onClick={backToPassport}
+          >
+            {t("chBackToPassport")}
+          </BigButton>
+        )}
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] max-w-md mx-auto p-4 py-6 flex flex-col justify-between">
-      {/* STAGE 1: Consent & Briefing */}
+    <div className="min-h-[calc(100vh-64px)] max-w-md mx-auto p-4 py-6 flex flex-col gap-6">
+      {error && renderError(error)}
+
+      {/* STAGE 1: Consent & briefing */}
       {stage === "consent" && (
         <div className="space-y-6">
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>Live AI Skill Assessment</span>
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-sm font-bold border border-emerald-200">
+              <Sparkles aria-hidden="true" className="w-4 h-4" />
+              <span>{t("chLiveBadge")}</span>
             </div>
-            <h2 className="text-2xl font-extrabold text-slate-900 leading-tight">
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              className="text-2xl font-extrabold text-slate-900 leading-tight"
+            >
               {t("challengeConsentTitle")}
-            </h2>
-            <p className="text-xs text-slate-600 max-w-xs mx-auto">
-              {challengeData?.task || t("challengeConsentBody")}
-            </p>
+            </h1>
+            <div className="flex items-start gap-3 text-left">
+              <p className="flex-1 text-base text-slate-700">
+                {challenge?.task || t("challengeConsentBody")}
+              </p>
+              <SpeakButton text={challenge?.task || t("challengeConsentBody")} size="lg" />
+            </div>
           </div>
 
-          {/* Spoken Code Display Box */}
-          {challengeData && (
-            <div className="bg-brand-50 border-2 border-brand-300 rounded-3xl p-5 text-center space-y-2 shadow-sm">
-              <div className="text-xs font-bold uppercase tracking-wider text-brand-700">
-                Your Secret Challenge Code
-              </div>
-              <div className="text-4xl font-black tracking-widest text-brand-900 font-mono">
-                {challengeData.code}
-              </div>
-              <p className="text-xs text-brand-800 font-medium">
-                Say this 3-digit code out loud as soon as recording starts.
+          {!challenge && !error && (
+            <p
+              role="status"
+              className="flex items-center justify-center gap-2 text-base font-semibold text-slate-700"
+            >
+              <Loader2 aria-hidden="true" className="w-5 h-5 animate-spin" />
+              {t("chGettingCode")}
+            </p>
+          )}
+
+          {challenge && (
+            <section
+              aria-labelledby="ch-code-title"
+              className="bg-brand-50 border-2 border-brand-300 rounded-3xl p-5 text-center space-y-2 shadow-sm"
+            >
+              <h2
+                id="ch-code-title"
+                className="text-sm font-bold uppercase tracking-wider text-brand-800"
+              >
+                {t("chCodeTitle")}
+              </h2>
+              <p className="text-5xl font-black tracking-widest text-brand-900 font-mono">
+                {challenge.code}
               </p>
+              <p className="text-base text-brand-900 font-medium">{t("chCodeHint")}</p>
               <div className="flex justify-center pt-1">
                 <SpeakButton
-                  text={`Your challenge code is ${challengeData.code.split("").join(" ")}. Say it at the start.`}
-                  size="md"
+                  text={t("chCodeSpeech", { code: spaced(challenge.code) })}
+                  size="lg"
                 />
               </div>
-            </div>
+            </section>
           )}
 
-          {/* Checklist Preview */}
-          {challengeData?.checklist && (
-            <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm space-y-2">
-              <div className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                Safety & Practical Checklist
-              </div>
-              {challengeData.checklist.map((item: any) => (
-                <div
-                  key={item.id}
-                  className="flex items-start space-x-2 text-xs text-slate-700 py-1"
-                >
-                  <span className="text-emerald-600 font-bold">•</span>
-                  <span>
-                    {item.text[lang] || item.text.en}
-                    {item.safetyCritical && (
-                      <span className="text-amber-700 font-bold ml-1">
-                        (Critical Safety)
-                      </span>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
+          {challenge && challenge.checklist.length > 0 && (
+            <section
+              aria-labelledby="ch-steps-title"
+              className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm space-y-2"
+            >
+              <h2
+                id="ch-steps-title"
+                className="text-sm font-extrabold uppercase tracking-wider text-slate-700"
+              >
+                {t("chChecklistTitle")}
+              </h2>
+              <ul className="space-y-2">
+                {challenge.checklist.map((item) => (
+                  <li key={item.id} className="flex items-start gap-2 text-base text-slate-800">
+                    <span aria-hidden="true" className="text-emerald-700 font-bold">
+                      •
+                    </span>
+                    <span>
+                      {item.text[lang] || item.text.en}
+                      {item.safetyCritical && (
+                        <span className="block text-sm text-amber-800 font-bold">
+                          {t("chSafetyCritical")}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
-          <BigButton
-            variant="verified"
-            icon={<Camera className="w-6 h-6" />}
-            onClick={handleStartRecording}
-            disabled={!challengeData}
-          >
-            {t("startChallenge")}
-          </BigButton>
+          <div className="space-y-3">
+            <BigButton
+              variant="verified"
+              icon={<Camera aria-hidden="true" className="w-6 h-6" />}
+              onClick={handleStart}
+              disabled={!challenge}
+            >
+              {t("startChallenge")}
+            </BigButton>
+            <BigButton
+              variant="outline"
+              icon={<ArrowLeft aria-hidden="true" className="w-5 h-5" />}
+              onClick={backToPassport}
+            >
+              {t("chBackToPassport")}
+            </BigButton>
+          </div>
         </div>
       )}
 
-      {/* STAGE 2: In-app Camera Recording with HUGE CODE OVERLAY */}
+      {/* STAGE 2: In-app camera recording with a big code overlay */}
       {stage === "recording" && (
-        <div className="relative flex flex-col justify-between h-[75vh] rounded-3xl overflow-hidden bg-black shadow-2xl">
-          {/* Live Video Preview */}
+        <div className="relative flex flex-col justify-between h-[75vh] min-h-[440px] rounded-3xl overflow-hidden bg-black shadow-2xl">
           <video
             ref={videoRef}
             playsInline
             muted
+            autoPlay
+            aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover"
           />
 
-          {/* Top Bar: Live Timer & Pulse */}
-          <div className="relative z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
-            <div className="flex items-center space-x-2 bg-rose-600/90 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow">
-              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-              <span>REC</span>
-            </div>
-
-            <div className="bg-black/60 backdrop-blur-md text-white font-mono font-bold text-sm px-3.5 py-1.5 rounded-full border border-white/20">
-              0:{secondsLeft < 10 ? `0${secondsLeft}` : secondsLeft}
-            </div>
-          </div>
-
-          {/* HUGE CODE OVERLAY in the center of the camera preview */}
-          <div className="relative z-20 self-center pointer-events-none select-none text-center">
-            <div className="bg-black/60 backdrop-blur-md border-2 border-white/40 px-6 py-2.5 rounded-3xl shadow-2xl">
-              <span className="text-[10px] uppercase font-bold tracking-widest text-slate-300 block">
-                SAY THIS CODE:
-              </span>
-              <span className="text-5xl font-black text-amber-400 font-mono tracking-widest drop-shadow-md">
-                {challengeData?.code}
-              </span>
-            </div>
-          </div>
-
-          {/* Bottom Bar: Stop Button */}
-          <div className="relative z-20 p-5 bg-gradient-to-t from-black/80 to-transparent flex justify-center">
-            <button
-              onClick={handleStopRecording}
-              disabled={isStopping}
-              className="w-20 h-20 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex flex-col items-center justify-center shadow-2xl active:scale-95 border-4 border-white transition-all"
+          <div className="relative z-20 flex items-center justify-between gap-2 p-4 bg-gradient-to-b from-black/80 to-transparent">
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              className="flex items-center gap-2 bg-rose-700 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow"
             >
-              <Square className="w-8 h-8 fill-current" />
-              <span className="text-[10px] font-bold uppercase tracking-wider mt-0.5">
-                Finish
+              <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+              {t("chRecordingNow")}
+            </h2>
+            <div
+              role="timer"
+              aria-label={t("chSecondsLeft", { n: secondsLeft })}
+              className="bg-black/70 text-white font-mono font-bold text-lg px-4 py-1.5 rounded-full border border-white/30"
+            >
+              {formatClock(secondsLeft)}
+            </div>
+          </div>
+          <p className="sr-only" aria-live="polite">
+            {timeMark ? t("chSecondsLeft", { n: timeMark }) : ""}
+          </p>
+
+          <div className="relative z-20 self-center text-center space-y-3 px-4">
+            {!cameraReady && (
+              <p
+                role="status"
+                className="flex items-center justify-center gap-2 bg-black/70 text-white text-base font-semibold px-4 py-2 rounded-2xl"
+              >
+                <Loader2 aria-hidden="true" className="w-5 h-5 animate-spin" />
+                {t("chStartingCamera")}
+              </p>
+            )}
+            <div className="bg-black/70 border-2 border-white/40 px-6 py-3 rounded-3xl shadow-2xl select-none">
+              <span className="block text-sm uppercase font-bold tracking-widest text-white">
+                {t("chSayThisCode")}
               </span>
+              <span className="block text-5xl font-black text-amber-300 font-mono tracking-widest">
+                {challenge?.code}
+              </span>
+            </div>
+          </div>
+
+          <div className="relative z-20 p-4 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-center gap-6">
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="min-h-[56px] px-5 rounded-full bg-white text-slate-900 text-base font-bold flex items-center gap-2 shadow-lg active:scale-95"
+            >
+              <X aria-hidden="true" className="w-6 h-6" />
+              {t("cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={handleFinish}
+              disabled={!cameraReady}
+              className="w-24 h-24 rounded-full bg-rose-700 hover:bg-rose-800 text-white flex flex-col items-center justify-center shadow-2xl active:scale-95 border-4 border-white transition-all disabled:opacity-60 disabled:active:scale-100"
+            >
+              <Square aria-hidden="true" className="w-8 h-8 fill-current" />
+              <span className="text-sm font-bold mt-1">{t("chFinish")}</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* STAGE 3: AI Analyzing Pipeline */}
-      {stage === "analyzing" && (
-        <div className="flex flex-col items-center justify-center space-y-6 my-auto text-center p-6">
-          <div className="relative w-28 h-28">
+      {/* STAGE 3: Uploading, then AI checking */}
+      {stage === "analyzing" && !error && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex flex-col items-center justify-center space-y-6 my-auto text-center p-6"
+        >
+          <div aria-hidden="true" className="relative w-28 h-28">
             <div className="absolute inset-0 rounded-full border-4 border-brand-200 border-t-brand-600 animate-spin" />
             <div className="absolute inset-3 rounded-full bg-brand-50 flex items-center justify-center">
               <Sparkles className="w-10 h-10 text-brand-600 animate-pulse" />
             </div>
           </div>
-
           <div className="space-y-2">
-            <h3 className="text-xl font-extrabold text-slate-900">
-              {t("checkingVideo")}
-            </h3>
-            <p className="text-xs text-slate-500 max-w-xs">
-              Claude AI is inspecting your video frames against safety rules and spoken code verification…
-            </p>
+            <h2 ref={headingRef} tabIndex={-1} className="text-xl font-extrabold text-slate-900">
+              {phase === "uploading" ? t("chUploading") : t("checkingVideo")}
+            </h2>
+            <p className="text-base text-slate-700 max-w-xs">{t("chAnalyzingBody")}</p>
           </div>
         </div>
       )}
 
-      {/* STAGE 4: Graded Result */}
+      {/* STAGE 4: Graded result */}
       {stage === "result" && result && (
         <div className="space-y-6">
-          {/* Status Banner */}
           <div
-            className={`p-6 rounded-3xl text-center space-y-2 shadow-sm border-2 ${
+            role="status"
+            className={`p-6 rounded-3xl text-center space-y-3 shadow-sm border-2 ${
               result.status === "PASS"
                 ? "bg-emerald-50 border-emerald-400 text-emerald-900"
                 : result.status === "REVIEW"
@@ -295,70 +599,127 @@ export const Challenge: React.FC = () => {
                 : "bg-rose-50 border-rose-400 text-rose-900"
             }`}
           >
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white shadow-md mx-auto mb-1">
+            <div
+              aria-hidden="true"
+              className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white shadow-md mx-auto"
+            >
               {result.status === "PASS" ? (
-                <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                <CheckCircle2 className="w-8 h-8 text-emerald-700" />
               ) : result.status === "REVIEW" ? (
-                <AlertCircle className="w-8 h-8 text-amber-600" />
+                <AlertCircle className="w-8 h-8 text-amber-700" />
               ) : (
-                <XCircle className="w-8 h-8 text-rose-600" />
+                <XCircle className="w-8 h-8 text-rose-700" />
               )}
             </div>
 
-            <h3 className="text-xl font-extrabold leading-tight">
-              {result.status === "PASS"
-                ? t("challengePassed")
-                : result.status === "REVIEW"
-                ? t("challengeReview")
-                : t("challengeFailed")}
-            </h3>
+            <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-extrabold leading-tight">
+              {statusHeading(result.status)}
+            </h2>
 
-            <p className="text-xs font-semibold max-w-xs mx-auto">
-              {result.feedback}
-            </p>
+            {result.feedback && <p className="text-base font-semibold">{result.feedback}</p>}
+            {result.status === "REVIEW" && (
+              <p className="text-base font-semibold">{t("chReviewNote")}</p>
+            )}
 
-            {/* Retake tip from backend tips.json */}
             {result.tip && (
-              <div className="mt-3 p-3 bg-white/80 rounded-2xl text-xs font-bold text-slate-800 border border-current/20">
-                💡 Tip: {result.tip}
+              <div className="p-3 bg-white rounded-2xl text-base font-bold text-slate-800 border border-slate-200 text-left">
+                <span className="block text-sm uppercase tracking-wider text-slate-700">
+                  {t("chTip")}
+                </span>
+                {result.tip}
               </div>
             )}
+
+            <div className="flex justify-center">
+              <SpeakButton text={resultSpeech(result)} size="lg" />
+            </div>
           </div>
 
-          {/* Earned Badge Card */}
+          {/* Non-PASS: show which steps were seen, so the retake fixes the right thing. */}
+          {result.status !== "PASS" && result.items.length > 0 && (
+            <section
+              aria-labelledby="ch-seen-title"
+              className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm space-y-2"
+            >
+              <h3
+                id="ch-seen-title"
+                className="text-sm font-extrabold uppercase tracking-wider text-slate-700"
+              >
+                {t("chStepsTitle")}
+              </h3>
+              <ul className="space-y-2">
+                {result.items.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 text-base text-slate-800"
+                  >
+                    {item.status === "seen" ? (
+                      <CheckCircle2 aria-hidden="true" className="w-6 h-6 text-emerald-700 flex-shrink-0" />
+                    ) : item.status === "unclear" ? (
+                      <HelpCircle aria-hidden="true" className="w-6 h-6 text-amber-700 flex-shrink-0" />
+                    ) : (
+                      <XCircle aria-hidden="true" className="w-6 h-6 text-rose-700 flex-shrink-0" />
+                    )}
+                    <span className="flex-1">
+                      {stepText(item.id, item.text)}
+                      <span
+                        className={`block text-sm font-bold ${
+                          item.status === "seen"
+                            ? "text-emerald-800"
+                            : item.status === "unclear"
+                            ? "text-amber-800"
+                            : "text-rose-800"
+                        }`}
+                      >
+                        {t(
+                          item.status === "seen"
+                            ? "chSeen"
+                            : item.status === "unclear"
+                            ? "chUnclear"
+                            : "chNotSeen"
+                        )}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {result.status === "PASS" && (
             <BadgeCard
               badge={{
                 skillId: result.skillId || skillId || "",
-                score: result.score || 88,
-                createdAt: new Date().toISOString(),
+                score: result.score ?? 0,
+                createdAt: result.createdAt ?? new Date().toISOString(),
                 daysAgo: 0,
                 items: result.items,
               }}
+              skillDetails={result.title ? { title: result.title } : undefined}
             />
           )}
 
-          {/* Action Buttons */}
           <div className="space-y-3">
-            <BigButton
-              variant={result.status === "PASS" ? "verified" : "outline"}
-              onClick={() => navigate(`/w/${workerId}`)}
-            >
-              {result.status === "PASS" ? "Go to My Passport" : "Back to Home"}
-            </BigButton>
-
             {result.status !== "PASS" && (
               <BigButton
                 variant="warning"
-                icon={<RotateCcw className="w-5 h-5" />}
-                onClick={() => {
-                  setStage("consent");
-                  setResult(null);
-                }}
+                icon={<RotateCcw aria-hidden="true" className="w-5 h-5" />}
+                onClick={() => void loadChallenge()}
               >
                 {t("retakeChallenge")}
               </BigButton>
             )}
+            <BigButton
+              variant={result.status === "PASS" ? "verified" : "outline"}
+              icon={
+                result.status === "PASS" ? undefined : (
+                  <ArrowLeft aria-hidden="true" className="w-5 h-5" />
+                )
+              }
+              onClick={backToPassport}
+            >
+              {result.status === "PASS" ? t("chGoToPassport") : t("chBackToPassport")}
+            </BigButton>
           </div>
         </div>
       )}

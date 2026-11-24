@@ -1,11 +1,13 @@
 <!doctype html>
-<html lang="en">
+<!-- lang matches the app's default language (kn); LanguageProvider updates it after mount. -->
+<html lang="kn">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- Pinch-zoom stays allowed: low-vision users need it. touch-action in index.css removes the tap delay. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0c3b6e" />
-    <title>SkilledIN — Voice-first Skill Passports</title>
+    <title>SkilledIN</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Kannada:wght@400;600;700&display=swap" rel="stylesheet">

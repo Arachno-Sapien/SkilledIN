@@ -1,7 +1,8 @@
 import { S3Client, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 
-const BUCKET_NAME = process.env.BUCKET_NAME || "skilledin-videos";
+// Read on each call, not at import: local.ts loads .env after ESM imports have run.
+const bucket = () => process.env.BUCKET_NAME;
 let s3Client: S3Client | null = null;
 
 function getS3(): S3Client {
@@ -15,57 +16,47 @@ function getS3(): S3Client {
 
 export async function createVideoUploadPolicy(challengeId: string) {
   const key = `videos/${challengeId}`;
+  const bucketName = bucket();
 
-  if (!process.env.BUCKET_NAME) {
-    // Dev mock upload endpoint
+  if (!bucketName) {
+    // Dev mock upload endpoint. Same fields as a real policy (no Content-Type) so the client takes the same path.
     return {
       url: `/api/mock-upload`,
-      fields: { key, "Content-Type": "video/webm" },
+      fields: { key } as Record<string, string>,
       key,
     };
   }
 
-  try {
-    const client = getS3();
-    const presigned = await createPresignedPost(client, {
-      Bucket: BUCKET_NAME,
-      Key: key,
-      Conditions: [
-        ["starts-with", "$Content-Type", "video/"],
-        ["content-length-range", 0, 50 * 1024 * 1024], // up to 50MB
-      ],
-      Expires: 900, // 15 mins
-    });
+  // No mock fallback once a bucket is configured: a fake policy "uploads" to nowhere and every submit then fails.
+  const presigned = await createPresignedPost(getS3(), {
+    Bucket: bucketName,
+    Key: key,
+    Conditions: [
+      ["starts-with", "$Content-Type", "video/"],
+      ["content-length-range", 0, 50 * 1024 * 1024], // up to 50MB
+    ],
+    Expires: 900, // 15 mins
+  });
 
-    return {
-      url: presigned.url,
-      fields: presigned.fields,
-      key,
-    };
-  } catch (err) {
-    console.warn("S3 presigned post error, using local fallback:", (err as Error).message);
-    return {
-      url: `/api/mock-upload`,
-      fields: { key, "Content-Type": "video/webm" },
-      key,
-    };
-  }
+  return {
+    url: presigned.url,
+    fields: presigned.fields,
+    key,
+  };
 }
 
+/** false only when the object is really absent; other S3 errors throw so they are not reported as "upload again". */
 export async function confirmVideoExists(key: string): Promise<boolean> {
-  if (!process.env.BUCKET_NAME) {
+  const bucketName = bucket();
+  if (!bucketName) {
     return true; // dev mode
   }
   try {
-    const client = getS3();
-    await client.send(
-      new HeadObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: key,
-      })
-    );
+    await getS3().send(new HeadObjectCommand({ Bucket: bucketName, Key: key }));
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+    if (e.name === "NotFound" || e.$metadata?.httpStatusCode === 404) return false;
+    throw err;
   }
 }

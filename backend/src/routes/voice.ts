@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { transcribeAudio, textToSpeech } from "../lib/elevenlabs.js";
-import { sendJson, sendError } from "../lib/http.js";
+import { sendJson, sendError, ah } from "../lib/http.js";
 
 export const voiceRouter = Router();
 
@@ -11,7 +11,7 @@ const transcribeSchema = z.object({
   lang: z.string().optional(),
 });
 
-voiceRouter.post("/transcribe", async (req, res) => {
+voiceRouter.post("/transcribe", ah(async (req, res) => {
   const parsed = transcribeSchema.safeParse(req.body);
   if (!parsed.success) {
     return sendError(res, 400, "BAD_REQUEST", "audioBase64 is required");
@@ -24,17 +24,18 @@ voiceRouter.post("/transcribe", async (req, res) => {
       parsed.data.lang
     );
     return sendJson(res, 200, result);
-  } catch (err) {
-    return sendError(res, 500, "INTERNAL", (err as Error).message);
+  } catch {
+    // Upstream failure: the client shows "didn't catch that" and reopens the mic.
+    return sendError(res, 502, "AI_FAILED", "Speech-to-text failed");
   }
-});
+}));
 
 const ttsSchema = z.object({
   text: z.string().min(1).max(500),
   lang: z.string().default("en"),
 });
 
-voiceRouter.post("/tts", async (req, res) => {
+voiceRouter.post("/tts", ah(async (req, res) => {
   const parsed = ttsSchema.safeParse(req.body);
   if (!parsed.success) {
     return sendError(res, 400, "BAD_REQUEST", "text (<= 500 chars) is required");
@@ -42,11 +43,8 @@ voiceRouter.post("/tts", async (req, res) => {
 
   try {
     const audioBase64 = await textToSpeech(parsed.data.text, parsed.data.lang);
-    if (!audioBase64) {
-      return sendError(res, 500, "AI_FAILED", "TTS generation unavailable");
-    }
-    return sendJson(res, 200, { audioBase64 });
+    return sendJson(res, 200, { audioBase64: audioBase64 ?? null });
   } catch (err) {
     return sendError(res, 500, "INTERNAL", (err as Error).message);
   }
-});
+}));

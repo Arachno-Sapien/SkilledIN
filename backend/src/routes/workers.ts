@@ -11,14 +11,15 @@ import {
   computeAvgRating,
   daysAgo,
 } from "../lib/scoring.js";
-import { sendJson, sendError } from "../lib/http.js";
+import { sendJson, sendError, ah } from "../lib/http.js";
+import { publicProfile, recoverRegistration, withSkillText } from "../lib/passport.js";
 
 export const workersRouter = Router();
 
 const WorkerTradeEnum = z.enum(["electrician", "plumber", "mason", "other"]);
 
 // POST /api/workers/parse
-workersRouter.post("/parse", async (req, res) => {
+workersRouter.post("/parse", ah(async (req, res) => {
   const schema = z.object({
     transcript: z.string(),
     lang: z.string().default("en"),
@@ -38,10 +39,10 @@ workersRouter.post("/parse", async (req, res) => {
   } catch (err) {
     return sendError(res, 500, "INTERNAL", (err as Error).message);
   }
-});
+}));
 
 // POST /api/workers
-workersRouter.post("/", async (req, res) => {
+workersRouter.post("/", ah(async (req, res) => {
   const schema = z.object({
     name: z.string().trim().min(1),
     phone: z.string().min(1),
@@ -93,21 +94,28 @@ workersRouter.post("/", async (req, res) => {
     createdAt: now,
   };
 
-  const success = await db.transactWorkerAndPhone(workerProfile, phoneLock);
-  if (!success) {
-    return sendError(
-      res,
-      409,
-      "CONFLICT",
-      "This phone number is already registered. Please sign in or use a different number."
-    );
+  let created: boolean;
+  try {
+    created = await db.transactWorkerAndPhone(workerProfile, phoneLock);
+  } catch (err) {
+    // Never answer 201 unless the write landed: the worker would think the passport is saved.
+    console.error(JSON.stringify({ level: "error", msg: "worker_save_failed", error: (err as Error).message }));
+    return sendError(res, 500, "INTERNAL", "Could not save your passport. Please try again.");
   }
 
-  return sendJson(res, 201, workerProfile);
-});
+  if (!created) {
+    const lock = await db.get(`PHONE#${cleanPhone}`, "PHONE");
+    const existing = lock ? await db.get(`WORKER#${lock.workerId}`, "PROFILE") : null;
+    const recovered = recoverRegistration(existing, parsed.data.name);
+    if (recovered) return sendJson(res, 200, recovered);
+    return sendError(res, 409, "CONFLICT", "This phone number is registered with a different name.");
+  }
+
+  return sendJson(res, 201, publicProfile(workerProfile));
+}));
 
 // GET /api/workers/:id (Public passport)
-workersRouter.get("/:id", async (req, res) => {
+workersRouter.get("/:id", ah(async (req, res) => {
   const workerId = req.params.id;
   const items = await db.queryPk(`WORKER#${workerId}`);
 
@@ -120,13 +128,15 @@ workersRouter.get("/:id", async (req, res) => {
   const passBadges = items
     .filter((i) => i.SK.startsWith("BADGE#") && i.status === "PASS")
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .map((b) => ({
-      skillId: b.skillId,
-      score: b.score,
-      items: b.items,
-      createdAt: b.createdAt,
-      daysAgo: daysAgo(b.createdAt),
-    }));
+    .map((b) =>
+      withSkillText({
+        skillId: b.skillId as string,
+        score: b.score,
+        items: (b.items ?? []) as { id: string; status: string; evidence: string }[],
+        createdAt: b.createdAt,
+        daysAgo: daysAgo(b.createdAt),
+      })
+    );
 
   const stamps = items
     .filter((i) => i.SK.startsWith("STAMP#"))
@@ -154,10 +164,10 @@ workersRouter.get("/:id", async (req, res) => {
     stamps,
     createdAt: profile.createdAt,
   });
-});
+}));
 
 // GET /api/workers/:id/offers
-workersRouter.get("/:id/offers", async (req, res) => {
+workersRouter.get("/:id/offers", ah(async (req, res) => {
   const workerId = req.params.id;
   const items = await db.queryPk(`WORKER#${workerId}`);
 
@@ -165,19 +175,21 @@ workersRouter.get("/:id/offers", async (req, res) => {
   const populatedOffers = await Promise.all(
     offers.map(async (offer) => {
       const jobItem = await db.get(`JOB#${offer.jobId}`, "META");
+      // A missing job is dropped, not shown with made-up area, date and wage.
+      if (!jobItem) return null;
       return {
         jobId: offer.jobId,
         status: offer.status,
         createdAt: offer.createdAt,
-        trade: jobItem?.trade || "general",
-        area: jobItem?.area || "Bengaluru",
-        date: jobItem?.date || "Tomorrow",
-        wage: jobItem?.wage || 800,
+        trade: jobItem.trade,
+        area: jobItem.area,
+        date: jobItem.date,
+        wage: jobItem.wage,
         // contractorPhone exposed ONLY on accepted offers
-        contractorPhone: offer.status === "accepted" ? jobItem?.contractorPhone : undefined,
+        contractorPhone: offer.status === "accepted" ? jobItem.contractorPhone : undefined,
       };
     })
   );
 
-  return sendJson(res, 200, populatedOffers);
-});
+  return sendJson(res, 200, populatedOffers.filter((o) => o !== null));
+}));

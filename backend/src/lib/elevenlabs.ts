@@ -21,8 +21,10 @@ export async function transcribeAudio(
 ): Promise<{ text: string; languageCode?: string }> {
   const client = getClient();
   if (!client) {
-    // Offline / Mock transcription fallback for dev testing
-    console.warn("ELEVENLABS_API_KEY not set. Using fallback transcript.");
+    // ponytail: canned transcript only for offline local dev (no Lambda, no key) so the voice flow can be clicked through — set ELEVENLABS_API_KEY to test real speech.
+    // Anywhere else a fake transcript registered every worker as "Ravi, electrician, Jayanagar".
+    if (process.env.AWS_LAMBDA_FUNCTION_NAME) throw new Error("ELEVENLABS_API_KEY is not set");
+    console.warn("ELEVENLABS_API_KEY not set. Using offline dev transcript.");
     return {
       text: "ನನ್ನ ಹೆಸರು ರವಿ, ನಾನು ಎಲೆಕ್ಟ್ರಿಷಿಯನ್, ಜಯನಗರದಲ್ಲಿ ಇದ್ದೇನೆ",
       languageCode: lang || "kn",
@@ -46,11 +48,9 @@ export async function transcribeAudio(
       languageCode: result.language_code || lang,
     };
   } catch (err) {
-    console.warn("ElevenLabs STT error, falling back to mock:", (err as Error).message);
-    return {
-      text: "ನನ್ನ ಹೆಸರು ರವಿ, ನಾನು ಎಲೆಕ್ಟ್ರಿಷಿಯನ್, ಜಯನಗರದಲ್ಲಿ ಇದ್ದೇನೆ",
-      languageCode: lang || "kn",
-    };
+    // Callers decide what an STT outage means (502 for voice input, REVIEW for a challenge); never invent words.
+    console.warn(JSON.stringify({ level: "warn", msg: "elevenlabs_stt_failed", error: (err as Error).message }));
+    throw err;
   }
 }
 

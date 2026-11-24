@@ -31,3 +31,24 @@ button:active {
 html {
   -webkit-text-size-adjust: 100%;
 }
+
+/* Keyboard and switch users must always see where focus is; mouse/touch taps stay clean. */
+:focus-visible {
+  outline: 3px solid #0267c8;
+  outline-offset: 2px;
+}
+
+/* Spinners and pulses still carry text next to them, so cutting motion loses no information. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  button:active {
+    transform: none;
+  }
+}

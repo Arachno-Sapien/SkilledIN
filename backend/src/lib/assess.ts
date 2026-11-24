@@ -3,7 +3,8 @@ import { z } from "zod";
 import { aiConfigured, complete } from "./ai.js";
 import type { ChecklistItem, ModelGrade } from "./scoring.js";
 
-const localities: string[] = localitiesData.map((l: any) => l.name);
+// Longest first so "Vijayanagar" is matched before its substring "Jayanagar".
+const localities: string[] = localitiesData.map((l) => l.name).sort((x, y) => y.length - x.length);
 
 export interface ParsedWorker {
   name: string | null;
@@ -62,63 +63,67 @@ Write readBack in ${languageName(lang)} as one natural sentence confirming the n
   return fallback;
 }
 
-function extractWorkerDeterministic(transcript: string, lang: string): ParsedWorker {
+type Trade = ParsedWorker["trade"];
+type Lang = "en" | "hi" | "kn";
+
+const TRADE_TITLES: Record<Trade, Record<Lang, string>> = {
+  electrician: { en: "Electrician", hi: "इलेक्ट्रीशियन", kn: "ಎಲೆಕ್ಟ್ರಿಷಿಯನ್" },
+  plumber: { en: "Plumber", hi: "प्लम्बर", kn: "ಪ್ಲಂಬರ್" },
+  mason: { en: "Mason", hi: "राजमिस्त्री", kn: "ಗಾರೆ ಕೆಲಸಗಾರ" },
+  other: { en: "Tradesperson", hi: "कारीगर", kn: "ಕುಶಲಕರ್ಮಿ" },
+};
+
+// Latin transliterations plus Devanagari and Kannada spellings, because STT writes in the script of the
+// language spoken. "ನಲ್ಲಿ" (tap) only as a word of its own: as a suffix it is the Kannada "in" ending
+// ("ಬೆಂಗಳೂರಿನಲ್ಲಿ ಕೆಲಸ" = work in Bengaluru), which a plain substring check read as plumber.
+const TRADE_WORDS: [Trade, (string | RegExp)[]][] = [
+  ["electrician", ["bijli", "electric", "बिजली", "इलेक्ट्रीशियन", "इलेक्ट्रिशियन", "ವಿದ್ಯುತ್", "ಎಲೆಕ್ಟ್ರಿಷಿಯನ್", "ಎಲೆಕ್ಟ್ರೀಷಿಯನ್"]],
+  ["plumber", ["plumb", /\bnal\b/, "प्लम्बर", "प्लंबर", "नलसाज", "नल वाला", "ಪ್ಲಂಬರ್", "ಪ್ಲಂಬಿಂಗ್", /(^|\s)ನಲ್ಲಿ/]],
+  ["mason", ["raj mistri", "rajmistri", "gaare", "mason", "mestri", "राजमिस्त्री", "राज मिस्त्री", "ಗಾರೆ", "ಮೇಸ್ತ್ರಿ"]],
+];
+
+// One word in Latin, Kannada or Devanagari letters; the Devanagari range skips the danda (।) sentence mark.
+const WORD = "([a-zA-Z\u0C80-\u0CFF\u0900-\u0963\u0966-\u097F]+)";
+const NAME_PATTERNS = [
+  new RegExp(`(?:name is|naam(?: hai)?|नाम(?: है)?|hesaru|ಹೆಸರು)\\s+${WORD}`, "i"),
+  new RegExp(`${WORD}\\s+(?:anubhav|electrician|plumber|mason)`, "i"),
+];
+// ponytail: filler words the second pattern would otherwise take as a name ("I am an electrician" -> "an"); the AI path handles real phrasing.
+const NOT_NAMES = new Set(["a", "an", "am", "i", "is", "my", "me", "the", "as", "main", "mai", "hoon", "hu", "naam", "मैं", "ನಾನು"]);
+
+/**
+ * Regex fallback when no AI model is configured or it fails. Returns null for anything not heard so the
+ * client asks again; never a default name or area (that once registered strangers as "Ravi, Jayanagar").
+ */
+export function extractWorkerDeterministic(transcript: string, lang: string): ParsedWorker {
   const t = transcript.toLowerCase();
-  let trade: "electrician" | "plumber" | "mason" | "other" = "other";
+  const l: Lang = lang === "hi" || lang === "kn" ? lang : "en";
 
-  if (t.includes("bijli") || t.includes("electric") || t.includes("ವಿದ್ಯುತ್")) {
-    trade = "electrician";
-  } else if (t.includes("nal") || t.includes("plumb") || t.includes("ನಲ್ಲಿ")) {
-    trade = "plumber";
-  } else if (t.includes("raj mistri") || t.includes("gaare") || t.includes("mason") || t.includes("ಗಾರೆ")) {
-    trade = "mason";
-  }
+  const trade: Trade =
+    TRADE_WORDS.find(([, words]) => words.some((w) => (typeof w === "string" ? t.includes(w) : w.test(t))))?.[0] ?? "other";
 
-  let matchedArea: string | null = null;
-  for (const loc of localities) {
-    if (t.includes(loc.toLowerCase())) {
-      matchedArea = loc;
-      break;
-    }
-  }
+  const area = localities.find((loc) => t.includes(loc.toLowerCase())) ?? null;
 
   let name: string | null = null;
-  const namePatterns = [
-    /(?:hesaru|name is|naam hai|ಹೆಸರು)\s+([a-zA-Z\u0C80-\u0CFF\u0900-\u097F]+)/i,
-    /([a-zA-Z\u0C80-\u0CFF\u0900-\u097F]+)\s+(?:anubhav|electrician|plumber|mason)/i,
-  ];
-  for (const pat of namePatterns) {
-    const match = transcript.match(pat);
-    if (match && match[1]) {
-      name = match[1].trim();
+  for (const pat of NAME_PATTERNS) {
+    const word = transcript.match(pat)?.[1]?.trim();
+    if (word && !NOT_NAMES.has(word.toLowerCase())) {
+      name = word;
       break;
     }
   }
-  if (!name && transcript.length > 0) {
-    name = "Ravi"; // standard default persona if extraction is partial
-  }
 
-  const tradeTitles = {
-    electrician: { en: "Electrician", hi: "इलेक्ट्रीशियन", kn: "ಎಲೆಕ್ಟ್ರಿಷಿಯನ್" },
-    plumber: { en: "Plumber", hi: "प्लम्बर", kn: "ಪ್ಲಂಬರ್" },
-    mason: { en: "Mason", hi: "राजमिस्त्री", kn: "ಗಾರೆ ಕೆಲಸಗಾರ" },
-    other: { en: "Tradesperson", hi: "कारीगर", kn: "ಕುಶಲಕರ್ಮಿ" },
-  };
-
-  const tradeName = tradeTitles[trade][(lang as "en" | "hi" | "kn") || "en"] || tradeTitles[trade].en;
-
-  let readBack = `${name || "Worker"}, ${tradeName}, ${matchedArea || "Bengaluru"}. Correct?`;
-  if (lang === "kn") {
-    readBack = `${name || "ರವಿ"}, ${tradeName}, ${matchedArea || "ಬೆಂಗಳೂರು"}. ಸರಿಯೇ?`;
-  } else if (lang === "hi") {
-    readBack = `${name || "रवि"}, ${tradeName}, ${matchedArea || "बेंगलुरु"}। क्या यह सही है?`;
-  }
+  // Read back only what was heard; "other" is the default trade, not something the worker said.
+  const parts = [name, trade !== "other" ? TRADE_TITLES[trade][l] : null, area].filter(Boolean);
+  const ask = { en: ". Correct?", hi: "। क्या यह सही है?", kn: ". ಸರಿಯೇ?" }[l];
+  const readBack = parts.length ? `${parts.join(", ")}${ask}` : "";
 
   return {
     name,
     trade,
-    area: matchedArea || "Jayanagar",
-    confidence: 0.9,
+    area,
+    // Regex guesses are weaker than a model answer, and weaker still with a field missing.
+    confidence: name && area ? 0.6 : 0.3,
     readBack,
   };
 }
