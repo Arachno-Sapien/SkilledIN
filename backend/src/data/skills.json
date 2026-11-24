@@ -1,0 +1,188 @@
+[
+  {
+    "id": "electrician.switch_socket",
+    "trade": "electrician",
+    "title": {
+      "en": "Wire a switch and socket",
+      "hi": "स्विच और सॉकेट की वायरिंग करें",
+      "kn": "ಸ್ವಿಚ್ ಮತ್ತು ಸಾಕೆಟ್ ವೈರಿಂಗ್ ಮಾಡಿ"
+    },
+    "task": {
+      "en": "Show how you wire one switch and one socket on a board. Say the code first, then hold each safety step close to the camera for a few seconds.",
+      "hi": "बोर्ड पर एक स्विच और एक सॉकेट की वायरिंग करके दिखाएं। पहले कोड बोलें, फिर प्रत्येक सुरक्षा कदम को कैमरे के पास कुछ सेकंड के लिए दिखाएं।",
+      "kn": "ಬೋರ್ಡ್‌ನಲ್ಲಿ ಒಂದು ಸ್ವಿಚ್ ಮತ್ತು ಒಂದು ಸಾಕೆಟ್ ವೈರಿಂಗ್ ಮಾಡುವುದನ್ನು ತೋರಿಸಿ. ಮೊದಲು ಕೋಡ್ ಹೇಳಿ, ನಂತರ ಪ್ರತಿ ಸುರಕ್ಷತಾ ಹಂತವನ್ನು ಕ್ಯಾಮೆರಾದ ಹತ್ತಿರ ಕೆಲವು ಸೆಕೆಂಡುಗಳ ಕಾಲ ಹಿಡಿಯಿರಿ."
+    },
+    "durationSec": 90,
+    "checklist": [
+      {
+        "id": "power_off",
+        "safetyCritical": true,
+        "text": {
+          "en": "Main power / MCB switched off before touching wires",
+          "hi": "तारों को छूने से पहले मेन पावर / MCB बंद किया गया",
+          "kn": "ವೈರ್‌ಗಳನ್ನು ಮುಟ್ಟುವ ಮೊದಲು ಮುಖ್ಯ ಪವರ್ / MCB ಆಫ್ ಮಾಡಲಾಗಿದೆ"
+        }
+      },
+      {
+        "id": "tester",
+        "safetyCritical": true,
+        "text": {
+          "en": "Line tester used to confirm no power",
+          "hi": "पावर न होने की पुष्टि के लिए लाइन टेस्टर का उपयोग किया गया",
+          "kn": "ಕರೆಂಟ್ ಇಲ್ಲದಿರುವುದನ್ನು ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಲು ಲೈನ್ ಟೆಸ್ಟರ್ ಬಳಸಲಾಗಿದೆ"
+        }
+      },
+      {
+        "id": "phase_switch",
+        "safetyCritical": true,
+        "text": {
+          "en": "Phase (red/brown) wire goes to the switch, not neutral",
+          "hi": "फेज (लाल/भूरा) तार स्विच में लगाया गया, न्यूट्रल में नहीं",
+          "kn": "ಫೇಸ್ (ಕೆಂಪು/ಕಂದು) ವೈರ್ ಸ್ವಿಚ್‌ಗೆ ಸಂಪರ್ಕಿಸಲಾಗಿದೆ, ನ್ಯೂಟ್ರಲ್‌ಗೆ ಅಲ್ಲ"
+        }
+      },
+      {
+        "id": "terminals",
+        "safetyCritical": false,
+        "text": {
+          "en": "Wires stripped to correct length and terminals tightened, no bare copper outside",
+          "hi": "तारों को सही लंबाई में छीला गया और टर्मिनल कसे गए, बाहर कोई खुला तांबा नहीं",
+          "kn": "ವೈರ್‌ಗಳನ್ನು ಸರಿಯಾದ ಉದ್ದಕ್ಕೆ ತೆಗೆದು ಟರ್ಮಿನಲ್‌ಗಳನ್ನು ಬಿಗಿಗೊಳಿಸಲಾಗಿದೆ, ಹೊರಗೆ ತಾಮ್ರದ ತಂತಿ ಕಾಣಿಸುವುದಿಲ್ಲ"
+        }
+      },
+      {
+        "id": "final_test",
+        "safetyCritical": false,
+        "text": {
+          "en": "Power restored and switch/socket tested working",
+          "hi": "पावर चालू करके स्विच/सॉकेट का काम करना परखा गया",
+          "kn": "ಪವರ್ ಆನ್ ಮಾಡಿ ಸ್ವಿಚ್ ಮತ್ತು ಸಾಕೆಟ್ ಕೆಲಸ ಮಾಡುತ್ತಿದೆಯೇ ಎಂದು ಪರೀಕ್ಷಿಸಲಾಗಿದೆ"
+        }
+      }
+    ]
+  },
+  {
+    "id": "plumber.tap_washer",
+    "trade": "plumber",
+    "title": {
+      "en": "Replace a leaking tap washer",
+      "hi": "टपकते नल का वॉशर बदलें",
+      "kn": "ಸೋರುತ್ತಿರುವ ನಲ್ಲಿಯ ವಾಷರ್ ಬದಲಾಯಿಸಿ"
+    },
+    "task": {
+      "en": "Show how you replace a tap washer. Say the code first, shut the main valve, use the right spanner, fit the washer, and check for leaks.",
+      "hi": "नल का वॉशर बदलना दिखाएं। पहले कोड बोलें, मेन वाल्व बंद करें, सही पाना का उपयोग करें, वॉशर लगाएं और लीकेज की जांच करें।",
+      "kn": "ನಲ್ಲಿ ವಾಷರ್ ಬದಲಾಯಿಸುವುದನ್ನು ತೋರಿಸಿ. ಮೊದಲು ಕೋಡ್ ಹೇಳಿ, ಮುಖ್ಯ ವಾಲ್ವ್ ಆಫ್ ಮಾಡಿ, ಸರಿಯಾದ ಸ್ಪ್ಯಾನರ್ ಬಳಸಿ, ವಾಷರ್ ಹಾಕಿ ಲೀಕ್ ಇಲ್ಲದಿರುವುದನ್ನು ಪರೀಕ್ಷಿಸಿ."
+    },
+    "durationSec": 90,
+    "checklist": [
+      {
+        "id": "main_valve_closed",
+        "safetyCritical": true,
+        "text": {
+          "en": "Main control valve closed before disassembling tap",
+          "hi": "नल खोलने से पहले मुख्य कंट्रोल वाल्व बंद किया गया",
+          "kn": "ನಲ್ಲಿ ಬಿಚ್ಚುವ ಮೊದಲು ಮುಖ್ಯ ವಾಲ್ವ್ ಬಂದ್ ಮಾಡಲಾಗಿದೆ"
+        }
+      },
+      {
+        "id": "spanner_used",
+        "safetyCritical": false,
+        "text": {
+          "en": "Correct spanner used without damaging tap chrome or body",
+          "hi": "नल के क्रोम या बॉडी को नुकसान पहुँचाए बिना सही पाना का उपयोग किया",
+          "kn": "ನಲ್ಲಿಯ ಬಾಡಿಗೆ ಹಾನಿಯಾಗದಂತೆ ಸರಿಯಾದ ಸ್ಪ್ಯಾನರ್ ಬಳಸಲಾಗಿದೆ"
+        }
+      },
+      {
+        "id": "washer_fitted",
+        "safetyCritical": false,
+        "text": {
+          "en": "Old worn washer removed and new correct-sized washer fitted securely",
+          "hi": "पुराना वॉशर हटाकर सही आकार का नया वॉशर मजबूती से लगाया गया",
+          "kn": "ಹಳೆಯ ವಾಷರ್ ತೆಗೆದು ಹೊಸ ಸರಿಯಾದ ಅಳತೆಯ ವಾಷರ್ ಹಾಕಲಾಗಿದೆ"
+        }
+      },
+      {
+        "id": "ptfe_tape",
+        "safetyCritical": false,
+        "text": {
+          "en": "PTFE thread seal tape wrapped clockwise on threads",
+          "hi": "थ्रेड्स पर दक्षिणावर्त दिशा में PTFE थ्रेड टेप लपेटा गया",
+          "kn": "ಥ್ರೆಡ್ ಮೇಲೆ ಪ್ರದಕ್ಷಿಣಾಕಾರವಾಗಿ PTFE ಟೇಪ್ ಸುತ್ತಲಾಗಿದೆ"
+        }
+      },
+      {
+        "id": "water_test_no_leak",
+        "safetyCritical": true,
+        "text": {
+          "en": "Water supply restored and confirmed zero leak under pressure",
+          "hi": "पानी का सप्लाई चालू करके दबाव में शून्य लीकेज की पुष्टि की गई",
+          "kn": "ನೀರು ಆನ್ ಮಾಡಿ ಯಾವುದೇ ಸೋರಿಕೆ ಇಲ್ಲದಿರುವುದನ್ನು ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಲಾಗಿದೆ"
+        }
+      }
+    ]
+  },
+  {
+    "id": "mason.brick_course",
+    "trade": "mason",
+    "title": {
+      "en": "Lay a level brick course",
+      "hi": "समतल ईंट की रद्दे की चिनाई करें",
+      "kn": "ಸಮಮಟ್ಟದ ಇಟ್ಟಿಗೆ ಸಾಲು ನಿರ್ಮಿಸಿ"
+    },
+    "task": {
+      "en": "Show how you lay a straight and level brick course. Say the code first, wet bricks, use a string line, check with a spirit level, and fill joints.",
+      "hi": "सीधी और समतल ईंट की चुनाई दिखाएं। पहले कोड बोलें, ईंटें भिगोएं, सूत धागे का उपयोग करें, स्पिरिट लेवल से जांचें और जोड़ भरें।",
+      "kn": "ನೇರ ಮತ್ತು ಸಮಮಟ್ಟದ ಇಟ್ಟಿಗೆ ಸಾಲು ಕಟ್ಟುವುದು ತೋರಿಸಿ. ಮೊದಲು ಕೋಡ್ ಹೇಳಿ, ಇಟ್ಟಿಗೆ ನೆನೆಸಿ, ದಾರ ಬಳಸಿ, ಸ್ಪಿರಿಟ್ ಲೆವೆಲ್ ಪರಿಶೀಲಿಸಿ ಕೀಲುಗಳನ್ನು ಮುಚ್ಚಿ."
+    },
+    "durationSec": 90,
+    "checklist": [
+      {
+        "id": "bricks_wetted",
+        "safetyCritical": false,
+        "text": {
+          "en": "Bricks properly wetted before mortar application",
+          "hi": "मसाला लगाने से पहले ईंटों को अच्छी तरह से भिगोया गया",
+          "kn": "ಗಾರೆ ಹಾಕುವ ಮೊದಲು ಇಟ್ಟಿಗೆಗಳನ್ನು ಸರಿಯಾಗಿ ನೆನೆಸಲಾಗಿದೆ"
+        }
+      },
+      {
+        "id": "string_alignment",
+        "safetyCritical": false,
+        "text": {
+          "en": "String line pulled taut to ensure perfect horizontal alignment",
+          "hi": "सटीक क्षैतिज सीध के लिए सूत धागा कसकर बांधा गया",
+          "kn": "ಸರಿಯಾದ ನೇರ ಸಾಲಿಗಾಗಿ ದಾರವನ್ನು ಬಿಗಿಯಾಗಿ ಹಿಡಿಯಲಾಗಿದೆ"
+        }
+      },
+      {
+        "id": "spirit_level_checked",
+        "safetyCritical": true,
+        "text": {
+          "en": "Spirit level used on top and face of course to confirm level and plumb",
+          "hi": "रद्दे के ऊपर और सामने स्पिरिट लेवल से समतलता और साहुल की पुष्टि की गई",
+          "kn": "ಇಟ್ಟಿಗೆ ಮೇಲ್ಭಾಗ ಮತ್ತು ಮುಂಭಾಗದಲ್ಲಿ ಸ್ಪಿರಿಟ್ ಲೆವೆಲ್ ಬಳಸಿ ಸಮತೋಲನ ಪರೀಕ್ಷಿಸಲಾಗಿದೆ"
+        }
+      },
+      {
+        "id": "mortar_consistency",
+        "safetyCritical": false,
+        "text": {
+          "en": "Mortar mixed to uniform consistency without dry pockets",
+          "hi": "मसाला एक समान मिलाया गया, कोई सूखा भाग नहीं छोड़ा गया",
+          "kn": "ಗಾರೆಯನ್ನು ಸಮಪ್ರಮಾಣದಲ್ಲಿ ಸರಿಯಾಗಿ ಮಿಶ್ರಣ ಮಾಡಲಾಗಿದೆ"
+        }
+      },
+      {
+        "id": "joints_filled",
+        "safetyCritical": false,
+        "text": {
+          "en": "Vertical and horizontal bed joints filled solidly (~10mm)",
+          "hi": "खड़े और आड़े जोड़ों को ठोस रूप से भरा गया (~10 मिमी)",
+          "kn": "ಲಂಬ ಮತ್ತು ಅಡ್ಡ ಕೀಲುಗಳನ್ನು ಸರಿಯಾಗಿ ಗಾರೆಯಿಂದ ತುಂಬಲಾಗಿದೆ (~10ಮಿಮೀ)"
+        }
+      }
+    ]
+  }
+]

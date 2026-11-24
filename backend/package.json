@@ -1,0 +1,35 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "tsc",
+    "dev": "tsx watch src/local.ts",
+    "test": "tsx --test test/scoring.test.ts test/ai.test.ts",
+    "seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^1.1.3",
+    "@aws-sdk/client-dynamodb": "^3.750.0",
+    "@aws-sdk/client-geo-places": "^3.750.0",
+    "@aws-sdk/client-s3": "^3.750.0",
+    "@aws-sdk/lib-dynamodb": "^3.750.0",
+    "@aws-sdk/s3-presigned-post": "^3.1175.0",
+    "@aws-sdk/s3-request-presigner": "^3.750.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "elevenlabs": "^1.59.0",
+    "express": "^4.21.2",
+    "serverless-http": "^3.2.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

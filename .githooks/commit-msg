@@ -1,0 +1,18 @@
+#!/bin/sh
+# Rejects commits that credit an AI tool as an author or co-author (AGENTS.md rule 3.11).
+# Enabled once per clone with: git config core.hooksPath .githooks
+
+pattern='^(co-authored-by|signed-off-by):.*(claude|anthropic|gemini|copilot|openai|chatgpt|codex|cursor)|generated with \[?claude code|^claude-session:'
+
+if grep -Eiq "$pattern" "$1"; then
+  echo "commit-msg: this commit message credits an AI tool. Remove these lines and commit again:" >&2
+  grep -Ein "$pattern" "$1" >&2
+  exit 1
+fi
+
+# The author itself must be a person, not an AI tool.
+author=$(git var GIT_AUTHOR_IDENT)
+if printf '%s\n' "$author" | grep -Eiq 'claude|anthropic|noreply@anthropic\.com'; then
+  echo "commit-msg: the commit author is an AI tool ($author). Commit as yourself." >&2
+  exit 1
+fi

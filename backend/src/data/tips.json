@@ -1,0 +1,37 @@
+{
+  "NO_CODE": {
+    "en": "Say your 3-digit code clearly out loud at the very start of your video.",
+    "hi": "वीडियो की शुरुआत में अपना 3-अंकों का कोड जोर से और स्पष्ट रूप से बोलें।",
+    "kn": "ವೀಡಿಯೊದ ಪ್ರಾರಂಭದಲ್ಲಿ ನಿಮ್ಮ 3-ಅಂಕಿಯ ಕೋಡ್ ಅನ್ನು ಸ್ಪಷ್ಟವಾಗಿ ಗಟ್ಟಿಯಾಗಿ ಹೇಳಿ."
+  },
+  "SAFETY_MISSED": {
+    "en": "Safety step missed: {step}. Always complete safety steps before continuing.",
+    "hi": "सुरक्षा कदम छूट गया: {step}। आगे बढ़ने से पहले हमेशा सुरक्षा नियम पूरे करें।",
+    "kn": "ಸುರಕ್ಷತಾ ಹಂತ ತಪ್ಪಿದೆ: {step}. ಮುಂದುವರಿಯುವ ಮೊದಲು ಯಾವಾಗಲೂ ಸುರಕ್ಷತಾ ಹಂತಗಳನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ."
+  },
+  "SAFETY_UNCLEAR": {
+    "en": "We couldn't see {step} clearly. Hold it close to the camera for 3 seconds.",
+    "hi": "हम {step} को स्पष्ट रूप से नहीं देख सके। इसे कैमरे के पास 3 सेकंड तक दिखाएं।",
+    "kn": "ನಾವು {step} ಅನ್ನು ಸ್ಪಷ್ಟವಾಗಿ ನೋಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಕ್ಯಾಮೆರಾದ ಹತ್ತಿರ 3 ಸೆಕೆಂಡುಗಳ ಕಾಲ ಹಿಡಿಯಿರಿ."
+  },
+  "REPLAY_SUSPECTED": {
+    "en": "Please record real hands-on work with your camera, not a phone or screen playback.",
+    "hi": "कृपया अपने कैमरे से वास्तविक काम रिकॉर्ड करें, किसी स्क्रीन या फोटो का वीडियो नहीं।",
+    "kn": "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಕ್ಯಾಮೆರಾದೊಂದಿಗೆ ನೈಜ ಕೆಲಸವನ್ನು ರೆಕಾರ್ಡ್ ಮಾಡಿ, ಬೇರೆ ಸ್ಕ್ರೀನ್ ಅಥವಾ ಫೋಟೋ ಅಲ್ಲ."
+  },
+  "LOW_CONFIDENCE": {
+    "en": "Lighting or camera angle was too dark or blurry. Record in good light with clear view.",
+    "hi": "रोशनी कम थी या कैमरा धुंधला था। अच्छी रोशनी में स्पष्ट रूप से रिकॉर्ड करें।",
+    "kn": "ಬೆಳಕು ಕಡಿಮೆಯಿತ್ತು ಅಥವಾ ಕ್ಯಾಮೆರಾ ಅಸ್ಪಷ್ಟವಾಗಿತ್ತು. ಉತ್ತಮ ಬೆಳಕಿನಲ್ಲಿ ಸ್ಪಷ್ಟವಾಗಿ ರೆಕಾರ್ಡ್ ಮಾಡಿ."
+  },
+  "LOW_SCORE": {
+    "en": "Several key practical steps were incomplete. Watch the example steps and try again.",
+    "hi": "कई महत्वपूर्ण काम के कदम अधूरे थे। उदाहरण कदम देखें और दोबारा प्रयास करें।",
+    "kn": "ಕೆಲವು ಪ್ರಮುಖ ಕೆಲಸದ ಹಂತಗಳು ಅಪೂರ್ಣವಾಗಿದ್ದವು. ಹಂತಗಳನ್ನು ಗಮನಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+  },
+  "AI_UNAVAILABLE": {
+    "en": "We couldn't check your video right now due to network load. Please try again in a minute.",
+    "hi": "नेटवर्क समस्या के कारण हम अभी वीडियो जांच नहीं सके। कृपया एक मिनट बाद दोबारा कोशिश करें।",
+    "kn": "ನೆಟ್‌ವರ್ಕ್ ಸಮಸ್ಯೆಯಿಂದಾಗಿ ಈಗ ನಿಮ್ಮ ವೀಡಿಯೊ ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+  }
+}

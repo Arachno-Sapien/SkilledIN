@@ -1,0 +1,33 @@
+# Dependencies & builds
+node_modules/
+dist/
+cdk.out/
+coverage/
+*.log
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Hackathon source files (not ours to publish)
+tracks.pdf
+updated_ideathon_guide.pdf
+*.pptx
+
+# Editor / OS / local AI state
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/settings.local.json
+graphify-out/
+.kiro/
+.claude/
+Problem.md
+solution.md
+AGENTS.md
+CLAUDE.md
+GATES.md
+docs/
+tests/

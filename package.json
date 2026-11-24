@@ -1,0 +1,34 @@
+{
+  "name": "skilledin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SkilledIN — Voice-first skill passports for India's blue-collar workers",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "infra"
+  ],
+  "scripts": {
+    "dev": "concurrently -n \"api,web\" -c \"blue,green\" \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "check": "npm run check --workspaces",
+    "test": "npm test -w backend",
+    "seed": "npm run seed -w backend",
+    "build": "npm run build --workspaces"
+  },
+  "keywords": [
+    "skilledin",
+    "elevenlabs",
+    "aws-bedrock",
+    "skill-verification",
+    "blue-collar",
+    "india"
+  ],
+  "author": "Team Adversity (wHACKiest 2026)",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.7",
+    "playwright": "^1.65.1"
+  }
+}
