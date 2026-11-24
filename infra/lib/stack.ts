@@ -83,13 +83,9 @@ export class SkilledInStack extends cdk.Stack {
     });
 
     // 4. Function URL (No 29s timeout limitation)
+    // No Function URL CORS: the Express app's cors middleware answers preflights, and two layers would send duplicate headers.
     const functionUrl = apiFunction.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
-      cors: {
-        allowedOrigins: ["http://localhost:5173", "http://localhost:3000", "*"],
-        allowedMethods: [lambda.HttpMethod.ALL],
-        allowedHeaders: ["*"],
-      },
     });
 
     // 5. IAM Permissions

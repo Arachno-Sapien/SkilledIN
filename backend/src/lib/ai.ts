@@ -95,37 +95,49 @@ export async function complete(req: AiRequest): Promise<string> {
     }
 
     case "openai-compatible": {
-      const res = await fetch(`${process.env.AI_BASE_URL!.replace(/\/$/, "")}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(process.env.AI_API_KEY ? { Authorization: `Bearer ${process.env.AI_API_KEY}` } : {}),
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: req.maxTokens,
-          messages: [
-            { role: "system", content: req.system },
-            {
-              role: "user",
-              content: [
-                ...images.map((b64) => ({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } })),
-                { type: "text", text: req.text },
-              ],
+      // ponytail: comma-separated AI_MODEL_ID = fallback list, tried in order; free endpoints are often busy.
+      // 55 s per try keeps two tries inside the Lambda's 120 s timeout.
+      const models = model.split(",").map((m) => m.trim()).filter(Boolean);
+      let lastError: unknown;
+      for (const m of models) {
+        try {
+          const res = await fetch(`${process.env.AI_BASE_URL!.replace(/\/$/, "")}/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(process.env.AI_API_KEY ? { Authorization: `Bearer ${process.env.AI_API_KEY}` } : {}),
             },
-          ],
-        }),
-        signal: AbortSignal.timeout(90_000),
-      });
-      if (!res.ok) throw new Error(`AI endpoint returned HTTP ${res.status}`);
-      const json = (await res.json()) as {
-        choices?: { message?: { content?: string } }[];
-        usage?: { prompt_tokens?: number; completion_tokens?: number };
-      };
-      logUsage(json.usage?.prompt_tokens, json.usage?.completion_tokens);
-      const text = json.choices?.[0]?.message?.content;
-      if (!text) throw new Error("No text in model response");
-      return text;
+            body: JSON.stringify({
+              model: m,
+              max_tokens: req.maxTokens,
+              messages: [
+                { role: "system", content: req.system },
+                {
+                  role: "user",
+                  content: [
+                    ...images.map((b64) => ({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } })),
+                    { type: "text", text: req.text },
+                  ],
+                },
+              ],
+            }),
+            signal: AbortSignal.timeout(55_000),
+          });
+          if (!res.ok) throw new Error(`${m} returned HTTP ${res.status}`);
+          const json = (await res.json()) as {
+            choices?: { message?: { content?: string } }[];
+            usage?: { prompt_tokens?: number; completion_tokens?: number };
+          };
+          logUsage(json.usage?.prompt_tokens, json.usage?.completion_tokens);
+          const text = json.choices?.[0]?.message?.content;
+          if (!text) throw new Error(`${m} returned no text`);
+          return text;
+        } catch (err) {
+          lastError = err;
+          console.warn(JSON.stringify({ level: "warn", msg: "ai_model_failed", model: m, error: (err as Error).message }));
+        }
+      }
+      throw lastError;
     }
   }
 }

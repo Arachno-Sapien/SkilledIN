@@ -160,7 +160,7 @@ Every model call goes through `backend/src/lib/ai.ts`. Hosts switch models with 
 |---|---|---|
 | `claude-bedrock` (default) | Claude on Amazon Bedrock | `anthropic.claude-opus-5-5`, `anthropic.claude-sonnet-5-5`, `anthropic.claude-haiku-5-5` |
 | `bedrock-converse` | Amazon Nova or another Bedrock model that reads images | a model ID from the Bedrock console |
-| `openai-compatible` | Any `/chat/completions` endpoint, e.g. a self-hosted open model on Ollama or vLLM (set `AI_BASE_URL`, plus `AI_API_KEY` if needed) | the endpoint's model name |
+| `openai-compatible` | Any `/chat/completions` endpoint: OpenRouter or NVIDIA (free models available), or a self-hosted open model on Ollama or vLLM. Set `AI_BASE_URL`, plus `AI_API_KEY` if needed | the endpoint's model name. A comma-separated list is tried in order, e.g. `nvidia/nemotron-3.5-super-vl:free,google/gemma-4-31b-it:free` with `AI_BASE_URL=https://openrouter.ai/api/v1` |
 
 Smaller models cost far less per check (roughly ₹5 on Opus 5.5 versus under ₹1 on Haiku 5.5, estimated from list prices). The pass/fail rules stay the same whichever model answers. Re-test on real clips after switching, and check a provider's data-use terms before sending workers' video frames outside AWS.
 

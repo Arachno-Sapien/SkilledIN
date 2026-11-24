@@ -37,3 +37,9 @@ test("parseGrade rejects answers that would otherwise be filled with passing def
   assert.equal(parseGrade(JSON.stringify({ ...good, items: [{ id: "isolate", status: "maybe" }] })), null);
   assert.equal(parseGrade("not json"), null);
 });
+
+test("parseGrade ignores <think> notes that contain braces", () => {
+  const grade = parseGrade(`<think>maybe {score: 10}?</think>
+${JSON.stringify(good)}`);
+  assert.equal(grade?.score, 80);
+});
