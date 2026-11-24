@@ -34,7 +34,7 @@ export async function transcribeAudio(
     const audioBlob = new Blob([audioBuffer], { type: mimeType });
 
     // Use Scribe STT
-    const model = process.env.ELEVENLABS_STT_MODEL || "scribe_v1";
+    const model = process.env.ELEVENLABS_STT_MODEL || "scribe_v3";
     const result = await (client as any).speechToText.convert({
       file: audioBlob,
       model_id: model,
@@ -64,8 +64,9 @@ export async function textToSpeech(
   }
 
   try {
-    const voiceId = process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM"; // Default clear voice
-    const modelId = process.env.ELEVENLABS_TTS_MODEL || "eleven_multilingual_v2";
+    // Default: premade "Sarah". Free plans can use premade voices via the API, but not Voice Library voices (HTTP 402).
+    const voiceId = process.env.ELEVENLABS_VOICE_ID || "EXAVITQu4vr4xnSDxMaL";
+    const modelId = process.env.ELEVENLABS_TTS_MODEL || "eleven_v4_turbo"; // speaks Hindi and Kannada
 
     const audioStream = await client.textToSpeech.convert(voiceId, {
       text: text.slice(0, 500),
