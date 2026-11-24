@@ -165,7 +165,7 @@ export const Passport: React.FC = () => {
         </div>
       )}
 
-      {/* Call to Action: "Hire workers like this" -> /hire per ARCHITECTURE §6 */}
+      {/* Call to Action: "Hire workers like this" -> /hire */}
       <div className="pt-2">
         <Link to="/hire">
           <BigButton

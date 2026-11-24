@@ -104,7 +104,7 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({ badge, skillDetails }) => 
         </div>
       )}
 
-      {/* Honest "Proves / Does not prove" disclaimer line per ARCHITECTURE §4 */}
+      {/* Honest "Proves / Does not prove" disclaimer line */}
       <div className="mt-4 pt-3 border-t border-slate-100 bg-slate-50/70 -mx-5 -mb-5 p-4 text-[11px] leading-relaxed text-slate-500">
         <p className="font-semibold text-slate-700">
           ✔ {t("badgeProves", { date: formattedDate })}

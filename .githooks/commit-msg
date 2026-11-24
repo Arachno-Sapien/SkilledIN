@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rejects commits that credit an AI tool as an author or co-author (AGENTS.md rule 3.11).
+# Rejects commits that credit an AI tool as an author or co-author. Commits are authored by team members only.
 # Enabled once per clone with: git config core.hooksPath .githooks
 
 pattern='^(co-authored-by|signed-off-by):.*(claude|anthropic|gemini|copilot|openai|chatgpt|codex|cursor)|generated with \[?claude code|^claude-session:'

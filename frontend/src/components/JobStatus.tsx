@@ -32,7 +32,7 @@ export const JobStatus: React.FC<JobStatusProps> = ({ jobId, workerId }) => {
 
   useEffect(() => {
     fetchJob();
-    const interval = setInterval(fetchJob, 5000); // Poll every 5s per ARCHITECTURE §5
+    const interval = setInterval(fetchJob, 5000); // Poll every 5s
     return () => clearInterval(interval);
   }, [jobId]);
 

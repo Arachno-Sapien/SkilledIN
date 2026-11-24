@@ -1,6 +1,6 @@
 /**
  * Normalises raw phone input to standard 10-digit Indian mobile number.
- * Kept identical to backend/src/lib/phone.ts per ARCHITECTURE §5.
+ * Kept identical to backend/src/lib/phone.ts.
  */
 export function normalisePhone(raw: string): string {
   if (!raw || typeof raw !== "string") {

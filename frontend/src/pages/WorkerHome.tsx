@@ -20,7 +20,7 @@ export const WorkerHome: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // UI Guard per ARCHITECTURE §6: if localStorage.workerId !== id, redirect to public passport
+    // UI Guard: if localStorage.workerId !== id, redirect to public passport
     const savedId = localStorage.getItem("skilledin_worker_id");
     if (savedId && savedId !== id) {
       navigate(`/p/${id}`);

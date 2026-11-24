@@ -51,7 +51,7 @@ challengesRouter.post("/", async (req, res) => {
 
   await db.put(challengeItem);
 
-  // Spaced and spoken twice per ARCHITECTURE §5
+  // Spaced and spoken twice so it is easy to catch
   const spacedCode = code.split("").join("… ");
   let spokenCodeText = `Your code is ${spacedCode}. Again: ${spacedCode}.`;
   if (lang === "hi") {
@@ -120,7 +120,7 @@ challengesRouter.post("/:id/submit", async (req, res) => {
     lang
   );
 
-  // AI failed: skip decide() and hold for review (ARCHITECTURE §7), never crash or auto-pass.
+  // AI failed: skip decide() and hold for review, never crash or auto-pass.
   const grade = modelGrade ?? {
     codeSpoken: false, items: [], score: 0, confidence: 0, replayRisk: "unclear" as const, feedback: "",
   };

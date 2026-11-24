@@ -231,7 +231,7 @@ test("Match reason formatting", () => {
   assert.equal(unverifiedReason, "Not verified yet, 2.1 km away");
 });
 
-test("Phone normalisation tests per ARCHITECTURE §5", () => {
+test("Phone normalisation tests", () => {
   assert.equal(normalisePhone("+91 9876543210"), "9876543210");
   assert.equal(normalisePhone("+91-98765-43210"), "9876543210");
   assert.equal(normalisePhone("919876543210"), "9876543210");

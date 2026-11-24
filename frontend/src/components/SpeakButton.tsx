@@ -12,7 +12,7 @@ interface SpeakButtonProps {
 const audioCache = new Map<string, string>();
 
 /**
- * Voice fallback chain per ARCHITECTURE §6:
+ * Voice fallback chain:
  * 1. Cache hit -> play instant
  * 2. Backend /api/voice/tts -> play audioBase64
  * 3. window.speechSynthesis (kn-IN / hi-IN / en-IN)

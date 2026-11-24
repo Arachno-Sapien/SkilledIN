@@ -79,7 +79,7 @@ export function normalizeItems(checklist: ChecklistItem[], reportedItems: ModelI
 }
 
 /**
- * 7 ordered badge decision rules (ARCHITECTURE §7):
+ * 7 ordered badge decision rules:
  * 1 NO_CODE            FAIL    codeSpoken == false
  * 2 SAFETY_MISSED      FAIL    any safetyCritical item == "not_seen"
  * 3 SAFETY_UNCLEAR     REVIEW  any safetyCritical item == "unclear"
@@ -144,7 +144,7 @@ export function decide(
 }
 
 /**
- * Computes trust level (solution.md §6):
+ * Computes trust level:
  * Level 0: Registered (no PASS badges)
  * Level 1: Verified (>= 1 PASS badge)
  * Level 2: Experienced (>= 1 PASS badge + >= 3 stamps with avg rating >= 4.0)
@@ -202,7 +202,7 @@ export function haversineDistanceKm(
 }
 
 /**
- * Matching rank score (ARCHITECTURE §8):
+ * Matching rank score:
  * level × 30 + (avgRating ?? 3.5) × 10 − distanceKm × 2
  */
 export function computeRankScore(
@@ -215,7 +215,7 @@ export function computeRankScore(
 }
 
 /**
- * Build spoken/rendered reason per match (ARCHITECTURE §8):
+ * Build spoken/rendered reason per match:
  * e.g. "Wiring check passed 12 days ago, 4.6★ from 3 customers, 2.1 km away"
  * unverified -> "Not verified yet, 1.4 km away"
  */

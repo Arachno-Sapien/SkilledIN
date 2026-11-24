@@ -69,7 +69,6 @@ export class SkilledInStack extends cdk.Stack {
         ELEVENLABS_STT_MODEL: process.env.ELEVENLABS_STT_MODEL || "",
         ELEVENLABS_TTS_MODEL: process.env.ELEVENLABS_TTS_MODEL || "",
         ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID || "",
-        DEMO_CANNED_GRADE: process.env.DEMO_CANNED_GRADE || "",
       },
       bundling: {
         format: lambdaNodejs.OutputFormat.ESM,

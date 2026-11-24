@@ -1,6 +1,6 @@
 /**
  * Normalises raw phone input to standard 10-digit Indian mobile number.
- * Follows ARCHITECTURE §5 specification:
+ * Rules:
  * - If raw starts with '+': digits must be 91 + 10 digits; drops 91.
  * - Else if 12 digits starting with 91: drops 91.
  * - Else if 11 digits starting with 0: drops 0.

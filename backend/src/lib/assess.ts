@@ -15,7 +15,6 @@ export interface ParsedWorker {
 
 /**
  * Extracts worker details from a speech transcript with the configured AI provider (lib/ai.ts).
- * Follows ARCHITECTURE §9.1 prompt & trade mappings.
  */
 export async function parseWorkerSpeech(
   transcript: string,
@@ -126,7 +125,6 @@ function extractWorkerDeterministic(transcript: string, lang: string): ParsedWor
 
 /**
  * Grades video frames and audio transcript against skill checklist.
- * Implements ARCHITECTURE §9.1 vision prompt, structured output, and token logging.
  */
 export async function gradeChallengeVideo(
   frames: string[],
@@ -178,7 +176,7 @@ ${transcript}
     } catch (err) {
       console.warn("AI grading failed:", (err as Error).message);
     }
-    return null; // caller saves REVIEW / AI_UNAVAILABLE (ARCHITECTURE §7)
+    return null; // caller saves REVIEW / AI_UNAVAILABLE
   }
 
   // ponytail: offline demo grader for local dev only; on Lambda a missing model config must never award a PASS.

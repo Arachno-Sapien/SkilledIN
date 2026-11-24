@@ -39,7 +39,7 @@ export const Hire: React.FC = () => {
   const [count, setCount] = useState<number>(1);
   const [wage, setWage] = useState<number>(800);
 
-  // ElevenLabs Client Tool Definition per ARCHITECTURE §9.2
+  // ElevenLabs Client Tool Definition
   const clientTools = {
     find_workers: async (params: {
       trade: "electrician" | "plumber" | "mason";
