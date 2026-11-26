@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { translations, useLanguage, type Language } from "../i18n";
 import { speak } from "../lib/speech";
 
@@ -45,9 +45,14 @@ export const Navbar: React.FC = () => {
             aria-label={t("home")}
             className="min-h-[48px] min-w-[48px] flex items-center gap-2.5 rounded-xl group"
           >
-            <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
-              <ShieldCheck aria-hidden="true" className="w-6 h-6" />
-            </div>
+            <img
+              src="/logo-96.png"
+              alt=""
+              aria-hidden="true"
+              width={40}
+              height={40}
+              className="w-10 h-10 rounded-full shadow-md group-hover:scale-105 transition-transform"
+            />
             {/* The wordmark only fits beside the Back button at 360 px on the home screen. */}
             {isHome && (
               <div aria-hidden="true">
